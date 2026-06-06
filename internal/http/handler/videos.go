@@ -140,7 +140,11 @@ func (h *Videos) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	page, pg := paginate(rows, limit, func(v sqlc.Video) string {
-		return encodeCursor(v.CreatedAt.Time, v.ID)
+		t := v.CreatedAt.Time
+		if v.RecordedAt.Valid {
+			t = v.RecordedAt.Time
+		}
+		return encodeCursor(t, v.ID)
 	})
 	out := make([]videoDTO, len(page))
 	for i, v := range page {
