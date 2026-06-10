@@ -18,8 +18,19 @@ import { MobileCaptureButton } from "../features/uploads/components/MobileCaptur
 import { VideoList } from "../features/videos/components/VideoList";
 import { selectOverlapping } from "../features/videos/lib/overlap";
 
+type Search = {
+  sessionId?: string;
+  deviceId?: string;
+};
+
 export const Route = createFileRoute("/videos")({
   component: VideosPage,
+  // Persist the list filters in the URL so they survive reloads and can be
+  // shared/bookmarked.
+  validateSearch: (s: Record<string, unknown>): Search => ({
+    sessionId: typeof s.sessionId === "string" ? s.sessionId : undefined,
+    deviceId: typeof s.deviceId === "string" ? s.deviceId : undefined,
+  }),
 });
 
 function VideosPage() {
@@ -28,14 +39,13 @@ function VideosPage() {
   // safe — a Run is per-Session, so we require the filter to be set before
   // letting the user build one. Otherwise the selection could span sessions
   // and the server would reject it.
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const { sessionId = null, deviceId = null } = Route.useSearch();
   const videos = useVideos(sessionId ? { sessionId } : {});
   const devices = useDevices();
   const sessions = useSessions();
   const currentUserId = useCurrentUserId();
   const currentTournamentId = useCurrentTournamentId();
   const navigate = useNavigate();
-  const [deviceId, setDeviceId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   // Uploads are owned by a module-level store so progress survives SPA
@@ -68,7 +78,10 @@ function VideosPage() {
             }))}
             value={sessionId}
             onChange={(v) => {
-              setSessionId(v);
+              navigate({
+                to: "/videos",
+                search: (prev) => ({ ...prev, sessionId: v ?? undefined }),
+              });
               // Selection across Sessions is meaningless for Run creation,
               // so clear it whenever the filter changes.
               setSelected(new Set());
@@ -82,7 +95,12 @@ function VideosPage() {
             placeholder="Device"
             data={devicesList.map((d) => ({ value: d.id, label: d.name }))}
             value={deviceId}
-            onChange={setDeviceId}
+            onChange={(v) =>
+              navigate({
+                to: "/videos",
+                search: (prev) => ({ ...prev, deviceId: v ?? undefined }),
+              })
+            }
             clearable
             w={200}
             size="sm"
