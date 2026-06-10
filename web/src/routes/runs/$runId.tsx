@@ -2,6 +2,7 @@ import {
   Alert,
   Button,
   Center,
+  Collapse,
   Group,
   Loader,
   Stack,
@@ -25,6 +26,7 @@ import { AddRunVideoModal } from "../../features/runs/components/AddRunVideoModa
 import { RunVideosTable } from "../../features/runs/components/RunVideosTable";
 import { RecommendedVideos } from "../../features/runs/components/RecommendedVideos";
 import { RunMetadataEditor } from "../../features/runs/components/RunMetadataEditor";
+import { RunScoutingNote } from "../../features/runs/components/RunScoutingNote";
 import { RunRobotImagesStrip } from "../../features/robot-images/components/RunRobotImagesStrip";
 
 export const Route = createFileRoute("/runs/$runId")({
@@ -42,6 +44,9 @@ function RunDetailPage() {
 
   const [addVideoOpen, { open: openAddVideo, close: closeAddVideo }] =
     useDisclosure(false);
+  // Offset / timeline editing is destructive (it rewrites RunVideo offsets and
+  // trims), so it stays collapsed until the user explicitly opens it.
+  const [editOpen, { toggle: toggleEdit }] = useDisclosure(false);
   const [t, setT] = useState(0);
   const [runDurationSec, setRunDurationSec] = useState(0);
   const seekRef = useRef<(sec: number) => void>(() => {});
@@ -124,17 +129,31 @@ function RunDetailPage() {
 
       <Group justify="space-between" mt="lg">
         <Title order={4}>紐づけアングル ({(r.videos ?? []).length})</Title>
-        <Button size="xs" onClick={openAddVideo}>
-          ＋ アングルを追加
-        </Button>
+        <Group gap="xs">
+          <Button
+            size="xs"
+            variant="default"
+            onClick={toggleEdit}
+            title="タイムライン上の位置・トリミングやオフセットを編集します（破壊的操作）"
+          >
+            {editOpen ? "▾ オフセット・タイムライン編集" : "▸ オフセット・タイムライン編集"}
+          </Button>
+          <Button size="xs" onClick={openAddVideo}>
+            ＋ アングルを追加
+          </Button>
+        </Group>
       </Group>
-      <AnglesTimeline
-        run={r}
-        currentSec={t}
-        durationSec={runDurationSec}
-        onSeek={(s) => seekRef.current(s)}
-      />
-      <RunVideosTable run={r} />
+      <Collapse expanded={editOpen}>
+        <Stack>
+          <AnglesTimeline
+            run={r}
+            currentSec={t}
+            durationSec={runDurationSec}
+            onSeek={(s) => seekRef.current(s)}
+          />
+          <RunVideosTable run={r} />
+        </Stack>
+      </Collapse>
 
       <RecommendedVideos run={r} />
 
@@ -158,6 +177,8 @@ function RunDetailPage() {
         onSave={(body) => updateRun.mutate({ id: r.id, body })}
         saving={updateRun.isPending}
       />
+
+      <RunScoutingNote run={r} />
 
       {addVideoOpen && <AddRunVideoModal run={r} onClose={closeAddVideo} />}
     </Stack>

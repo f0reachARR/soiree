@@ -13,6 +13,7 @@ import { UploadDropzone } from "../features/uploads/components/UploadDropzone";
 import { UploadQueue } from "../features/uploads/components/UploadQueue";
 import { MobileCaptureButton } from "../features/uploads/components/MobileCaptureButton";
 import { VideoList } from "../features/videos/components/VideoList";
+import { selectOverlapping } from "../features/videos/lib/overlap";
 
 export const Route = createFileRoute("/videos")({
   component: VideosPage,
@@ -122,6 +123,14 @@ function VideosPage() {
               {!sessionId && " — Session で絞り込んでから Run を作成できます"}
             </Text>
             <Group gap="xs">
+              <Button
+                size="xs"
+                variant="light"
+                onClick={() => setSelected(selectOverlapping(selected, list))}
+                title="選択中の動画と撮影時間帯が重なる動画をまとめて選択します"
+              >
+                ⇆ 範囲が重複する動画を選択
+              </Button>
               <Button
                 size="xs"
                 variant="filled"
