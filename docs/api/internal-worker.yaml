@@ -277,12 +277,12 @@ components:
         - type: object
           required: [passthroughOk]
           properties:
-            recordedAt: { type: string, format: date-time, nullable: true }
-            durationSec: { type: integer, format: int32, nullable: true }
+            recordedAt: { type: [string, "null"], format: date-time }
+            durationSec: { type: [integer, "null"], format: int32 }
             videoCodec: { type: string }
             audioCodec: { type: string }
-            width: { type: integer, format: int32, nullable: true }
-            height: { type: integer, format: int32, nullable: true }
+            width: { type: [integer, "null"], format: int32 }
+            height: { type: [integer, "null"], format: int32 }
             passthroughOk: { type: boolean }
             thumbnailKey:
               type: string
