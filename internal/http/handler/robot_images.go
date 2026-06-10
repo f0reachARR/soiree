@@ -145,7 +145,7 @@ func (h *RobotImages) Upload(w http.ResponseWriter, r *http.Request) {
 		case "caption":
 			b, _ := io.ReadAll(io.LimitReader(part, 1<<10))
 			captionDefault = string(b)
-			part.Close()
+			_ = part.Close()
 			continue
 		case "tournamentId":
 			b, _ := io.ReadAll(io.LimitReader(part, 64))
@@ -154,7 +154,7 @@ func (h *RobotImages) Upload(w http.ResponseWriter, r *http.Request) {
 			} else {
 				slog.Warn("robot image upload: invalid tournamentId part", "err", perr)
 			}
-			part.Close()
+			_ = part.Close()
 			continue
 		case "fingerprints":
 			b, _ := io.ReadAll(io.LimitReader(part, 1<<16))
@@ -173,7 +173,7 @@ func (h *RobotImages) Upload(w http.ResponseWriter, r *http.Request) {
 					bulkFingerprints[e.Filename] = bulkFP{HeadHashHex: e.HeadHashHex, SizeBytes: e.SizeBytes}
 				}
 			}
-			part.Close()
+			_ = part.Close()
 			continue
 		case "file":
 			res := h.processOne(r.Context(), robotID, uploader, captionDefault, part)
@@ -196,9 +196,9 @@ func (h *RobotImages) Upload(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 			}
-			part.Close()
+			_ = part.Close()
 		default:
-			part.Close()
+			_ = part.Close()
 		}
 	}
 
@@ -561,7 +561,7 @@ func streamObject(w http.ResponseWriter, r *http.Request, st *storage.Client, ke
 		notFound(w, "object not found")
 		return
 	}
-	defer body.Close()
+	defer func() { _ = body.Close() }()
 	if contentType != "" {
 		ct = contentType
 	}
@@ -598,7 +598,7 @@ func (b *limitedBuffer) Write(p []byte) (int, error) {
 	b.buf = append(b.buf, p...)
 	return len(p), nil
 }
-func (b *limitedBuffer) Len() int     { return len(b.buf) }
+func (b *limitedBuffer) Len() int      { return len(b.buf) }
 func (b *limitedBuffer) Bytes() []byte { return b.buf }
 
 func extensionFor(mime string) string {

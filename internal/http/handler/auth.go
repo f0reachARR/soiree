@@ -195,10 +195,10 @@ func (h *Auth) resolveUser(ctx context.Context, c auth.Claims) (*sqlc.User, erro
 	if c.Email != "" {
 		if u, err := h.Q.GetUserByEmail(ctx, c.Email); err == nil {
 			linked, err := h.Q.LinkUserOIDC(ctx, sqlc.LinkUserOIDCParams{
-				ID:       u.ID,
-				OidcSub:  c.Subject,
-				Email:    nonEmpty(c.Email),
-				Name:     nonEmpty(c.Name),
+				ID:      u.ID,
+				OidcSub: c.Subject,
+				Email:   nonEmpty(c.Email),
+				Name:    nonEmpty(c.Name),
 			})
 			if err != nil {
 				return nil, fmt.Errorf("link user: %w", err)

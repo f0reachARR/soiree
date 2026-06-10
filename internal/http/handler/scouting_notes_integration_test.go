@@ -17,7 +17,9 @@ type scoutingNoteResp struct {
 
 func seedTournamentAndTeams(t *testing.T, env *testEnv) (tournamentID, teamA, teamB string) {
 	t.Helper()
-	type idR struct{ ID string `json:"id"` }
+	type idR struct {
+		ID string `json:"id"`
+	}
 
 	var tour idR
 	rec := env.do(t, http.MethodPost, "/tournaments", map[string]any{"name": "T"}, &tour)

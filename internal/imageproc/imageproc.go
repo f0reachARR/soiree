@@ -24,7 +24,6 @@ import (
 	exifcommon "github.com/dsoprea/go-exif/v3/common"
 	"golang.org/x/image/draw"
 	_ "golang.org/x/image/webp" // register WebP decoder
-
 )
 
 // ThumbnailLongEdge is the long-edge pixel size of the generated thumbnail.
@@ -34,13 +33,13 @@ const ThumbnailLongEdge = 320
 // display copy / thumbnail.
 type Result struct {
 	// OrigBytes is the raw input. Always set.
-	OrigBytes        []byte
-	OrigContentType  string // sniffed; one of jpeg/png/webp/heic/heif
+	OrigBytes       []byte
+	OrigContentType string // sniffed; one of jpeg/png/webp/heic/heif
 
 	// DisplayBytes is set only when OrigBytes can't be safely served as-is
 	// (HEIC / HEIF) or when EXIF orientation needs to be baked in.
-	DisplayBytes        []byte
-	DisplayContentType  string
+	DisplayBytes       []byte
+	DisplayContentType string
 
 	// ThumbBytes is a JPEG with the long edge clamped to ThumbnailLongEdge.
 	ThumbBytes []byte
@@ -199,7 +198,7 @@ func decodeHEIC(raw []byte) (image.Image, error) {
 	if err != nil {
 		return nil, fmt.Errorf("tmpdir: %w", err)
 	}
-	defer os.RemoveAll(tmp)
+	defer func() { _ = os.RemoveAll(tmp) }()
 
 	inPath := filepath.Join(tmp, "in.heic")
 	outPath := filepath.Join(tmp, "out.jpg")
@@ -217,7 +216,7 @@ func decodeHEIC(raw []byte) (image.Image, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open converted: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	return jpeg.Decode(f)
 }
 
@@ -245,10 +244,10 @@ func scaleLongEdge(img image.Image, target int) image.Image {
 // applyOrientation rotates / flips img so the EXIF orientation tag becomes
 // a no-op. Values follow the EXIF spec:
 //
-//   1 = no transform        5 = transpose
-//   2 = flip horizontal     6 = rotate 90 CW
-//   3 = rotate 180          7 = transverse
-//   4 = flip vertical       8 = rotate 270 CW
+//	1 = no transform        5 = transpose
+//	2 = flip horizontal     6 = rotate 90 CW
+//	3 = rotate 180          7 = transverse
+//	4 = flip vertical       8 = rotate 270 CW
 func applyOrientation(img image.Image, orient int) image.Image {
 	switch orient {
 	case 2:

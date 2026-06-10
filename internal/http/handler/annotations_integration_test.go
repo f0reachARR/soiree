@@ -44,7 +44,9 @@ func TestAnnotationCRUD(t *testing.T) {
 	videoID := createTestVideo(t, env, "anno-test-key")
 
 	// user as author via X-User-Id
-	type idR struct{ ID string `json:"id"` }
+	type idR struct {
+		ID string `json:"id"`
+	}
 	var user idR
 	rec := env.do(t, http.MethodPost, "/users", map[string]any{"name": "Coach"}, &user)
 	mustStatus(t, rec, http.StatusCreated)

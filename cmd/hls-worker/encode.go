@@ -39,7 +39,7 @@ func runEncode(ctx context.Context, api *apiClient, store *storage.Client, job *
 	if err != nil {
 		return nil, fmt.Errorf("mkdtemp: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	opt := ffmpeg.HLSOptions{
 		Input:       claim.SourceURL,

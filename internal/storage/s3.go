@@ -109,7 +109,7 @@ func New(ctx context.Context, cfg Config) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) Bucket() string  { return c.bucket }
+func (c *Client) Bucket() string            { return c.bucket }
 func (c *Client) PresignTTL() time.Duration { return c.ttl }
 
 // PresignGet returns a time-limited GET URL for the given object key.
@@ -171,7 +171,7 @@ func (c *Client) PutFile(ctx context.Context, key, contentType, path string) err
 	if err != nil {
 		return fmt.Errorf("open %s: %w", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	stat, err := f.Stat()
 	if err != nil {
 		return fmt.Errorf("stat %s: %w", path, err)

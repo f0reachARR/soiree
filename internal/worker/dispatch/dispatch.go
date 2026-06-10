@@ -46,10 +46,10 @@ const MaxClaimWait = 30 * time.Second
 // Job is the unit dispatched to an external worker. Created by the River
 // worker via Submit.
 type Job struct {
-	ID       string
-	Type     string          // hlswire.Type*
-	Queue    string          // hlswire.Queue*
-	Payload  json.RawMessage // ClaimResponse.Payload
+	ID      string
+	Type    string          // hlswire.Type*
+	Queue   string          // hlswire.Queue*
+	Payload json.RawMessage // ClaimResponse.Payload
 
 	// OnProgress is invoked synchronously when a worker posts progress. If it
 	// returns an error the progress write fails (the worker can retry), but
