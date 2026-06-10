@@ -23,6 +23,7 @@ type Deps struct {
 	Videos         *handler.Videos
 	Runs           *handler.Runs
 	Markers        *handler.Markers
+	MarkerTypes    *handler.MarkerTypes
 	Tournaments    *handler.Tournaments
 	BulkUploads    *handler.BulkUploads
 	Matches        *handler.Matches
@@ -217,6 +218,8 @@ func mountAuthedRoutes(r chi.Router, d Deps) {
 		}
 		r.Get("/{tournamentId}/scouting-notes", d.ScoutingNotes.ListByTournament)
 		r.Get("/{tournamentId}/teams/{teamId}/scouting-note", d.ScoutingNotes.GetByTeam)
+		r.Get("/{tournamentId}/marker-types", d.MarkerTypes.List)
+		r.Post("/{tournamentId}/marker-types", d.MarkerTypes.Create)
 	})
 
 	r.Route("/matches", func(r chi.Router) {
@@ -236,6 +239,11 @@ func mountAuthedRoutes(r chi.Router, d Deps) {
 		r.Get("/{markerId}", d.Markers.Get)
 		r.Patch("/{markerId}", d.Markers.Update)
 		r.Delete("/{markerId}", d.Markers.Delete)
+	})
+
+	r.Route("/marker-types", func(r chi.Router) {
+		r.Patch("/{markerTypeId}", d.MarkerTypes.Update)
+		r.Delete("/{markerTypeId}", d.MarkerTypes.Delete)
 	})
 
 	r.Route("/annotations", func(r chi.Router) {

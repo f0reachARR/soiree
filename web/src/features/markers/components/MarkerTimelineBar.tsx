@@ -1,7 +1,7 @@
 import { Card } from "@mantine/core";
 
 import type { Marker } from "../../../lib/api/client";
-import { markerCategoryColor, markerCategoryLabel } from "../lib/category";
+import { markerDisplayColor, markerDisplayName } from "../lib/category";
 
 // Static (non-slider) horizontal bar showing one tick per marker.
 // Clicking a tick seeks to that marker's offset. Used in run detail view
@@ -32,7 +32,7 @@ export function MarkerTimelineBar({
               type="button"
               key={m.id}
               onClick={() => onSeek(m.runOffsetSec)}
-              title={`${formatTime(m.runOffsetSec)} ${markerCategoryLabel[m.category]}${m.label ? ` — ${m.label}` : ""}`}
+              title={`${formatTime(m.runOffsetSec)} ${markerDisplayName(m)}${m.label ? ` — ${m.label}` : ""}`}
               style={{
                 position: "absolute",
                 left: `${pct}%`,
@@ -40,7 +40,7 @@ export function MarkerTimelineBar({
                 transform: "translateX(-50%)",
                 width: 8,
                 height: 24,
-                background: `var(--mantine-color-${markerCategoryColor[m.category]}-6)`,
+                background: `var(--mantine-color-${markerDisplayColor(m)}-6)`,
                 border: 0,
                 borderRadius: 2,
                 cursor: "pointer",

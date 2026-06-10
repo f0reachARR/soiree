@@ -101,49 +101,6 @@ func (ns NullHLSStatus) Value() (driver.Value, error) {
 	return string(ns.HLSStatus), nil
 }
 
-type MarkerCategory string
-
-const (
-	MarkerCategorySuccess MarkerCategory = "success"
-	MarkerCategoryFailure MarkerCategory = "failure"
-	MarkerCategoryNote    MarkerCategory = "note"
-)
-
-func (e *MarkerCategory) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = MarkerCategory(s)
-	case string:
-		*e = MarkerCategory(s)
-	default:
-		return fmt.Errorf("unsupported scan type for MarkerCategory: %T", src)
-	}
-	return nil
-}
-
-type NullMarkerCategory struct {
-	MarkerCategory MarkerCategory
-	Valid          bool // Valid is true if MarkerCategory is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullMarkerCategory) Scan(value interface{}) error {
-	if value == nil {
-		ns.MarkerCategory, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.MarkerCategory.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullMarkerCategory) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.MarkerCategory), nil
-}
-
 type RenditionKind string
 
 const (
@@ -311,7 +268,16 @@ type Marker struct {
 	AuthorID     pgtype.UUID
 	RunOffsetSec int32
 	Label        string
-	Category     MarkerCategory
+	CreatedAt    pgtype.Timestamptz
+	MarkerTypeID pgtype.UUID
+}
+
+type MarkerType struct {
+	ID           pgtype.UUID
+	TournamentID pgtype.UUID
+	Name         string
+	Color        string
+	SortOrder    int32
 	CreatedAt    pgtype.Timestamptz
 }
 

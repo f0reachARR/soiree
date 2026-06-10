@@ -56,19 +56,26 @@ export function TeamPanel({
 }
 
 function MarkerStatsRow({ stats }: { stats?: TeamMarkerStats }) {
-  const s = stats ?? { success: 0, failure: 0, note: 0, teamId: "" };
-  const total = s.success + s.failure + s.note;
-  const successRate =
-    s.success + s.failure > 0
-      ? Math.round((s.success / (s.success + s.failure)) * 100)
-      : null;
+  const data = stats?.data ?? [];
+  const total = data.reduce((sum, d) => sum + d.count, 0);
+  if (data.length === 0) {
+    return (
+      <Text size="sm" c="dimmed">
+        Marker はまだありません
+      </Text>
+    );
+  }
   return (
     <Group>
-      <Stat label="成功" value={s.success} color="teal" />
-      <Stat label="失敗" value={s.failure} color="red" />
-      <Stat label="メモ" value={s.note} color="blue" />
+      {data.map((d) => (
+        <Stat
+          key={d.markerTypeId ?? "none"}
+          label={d.name ?? "種別なし"}
+          value={d.count}
+          color={d.color ?? "gray"}
+        />
+      ))}
       <Stat label="合計" value={total} />
-      {successRate != null && <Stat label="成功率" value={`${successRate}%`} />}
     </Group>
   );
 }

@@ -13,21 +13,13 @@ import {
 
 import { ApiError, type Marker, type Run } from "../../../lib/api/client";
 import { useMarkers } from "../../markers/api/queries";
+import {
+  markerDisplayColor,
+  markerDisplayName,
+} from "../../markers/lib/category";
 import { useRobots } from "../../robots/api/queries";
 import { useScenarios } from "../../scenarios/api/queries";
 import { useRun } from "../api/queries";
-
-const markerCategoryColor: Record<Marker["category"], string> = {
-  success: "teal",
-  failure: "red",
-  note: "blue",
-};
-
-const markerCategoryLabel: Record<Marker["category"], string> = {
-  success: "成功",
-  failure: "失敗",
-  note: "メモ",
-};
 
 export function SharedRunView({ runId }: { runId: string }) {
   const run = useRun(runId);
@@ -143,7 +135,7 @@ function SharedMarkers({ run, markers }: { run: Run; markers: Marker[] }) {
               return (
                 <div
                   key={m.id}
-                  title={`${m.runOffsetSec}s ${markerCategoryLabel[m.category]}${m.label ? ` — ${m.label}` : ""}`}
+                  title={`${m.runOffsetSec}s ${markerDisplayName(m)}${m.label ? ` — ${m.label}` : ""}`}
                   style={{
                     position: "absolute",
                     left: `${pct}%`,
@@ -151,7 +143,7 @@ function SharedMarkers({ run, markers }: { run: Run; markers: Marker[] }) {
                     transform: "translateX(-50%)",
                     width: 8,
                     height: 24,
-                    background: `var(--mantine-color-${markerCategoryColor[m.category]}-6)`,
+                    background: `var(--mantine-color-${markerDisplayColor(m)}-6)`,
                     borderRadius: 2,
                   }}
                 />
@@ -164,7 +156,7 @@ function SharedMarkers({ run, markers }: { run: Run; markers: Marker[] }) {
         <Table.Thead>
           <Table.Tr>
             <Table.Th style={{ width: 80 }}>Time</Table.Th>
-            <Table.Th style={{ width: 100 }}>Category</Table.Th>
+            <Table.Th style={{ width: 100 }}>種別</Table.Th>
             <Table.Th>Label</Table.Th>
           </Table.Tr>
         </Table.Thead>
@@ -177,8 +169,8 @@ function SharedMarkers({ run, markers }: { run: Run; markers: Marker[] }) {
                 </Text>
               </Table.Td>
               <Table.Td>
-                <Badge color={markerCategoryColor[m.category]} variant="light">
-                  {markerCategoryLabel[m.category]}
+                <Badge color={markerDisplayColor(m)} variant="light">
+                  {markerDisplayName(m)}
                 </Badge>
               </Table.Td>
               <Table.Td>

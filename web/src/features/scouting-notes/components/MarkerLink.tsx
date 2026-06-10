@@ -6,8 +6,9 @@ import {
 } from "@tiptap/react";
 import { useNavigate } from "@tanstack/react-router";
 
-import type { Marker, MarkerCategory } from "../../../lib/api/client";
+import type { Marker } from "../../../lib/api/client";
 import { useMarker } from "../../markers/api/queries";
+import { markerDisplayColor } from "../../markers/lib/category";
 
 declare module "@tiptap/core" {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -71,12 +72,6 @@ export const MarkerLink = Node.create({
   },
 });
 
-const categoryColor: Record<MarkerCategory, string> = {
-  success: "var(--mantine-color-teal-6)",
-  failure: "var(--mantine-color-red-6)",
-  note: "var(--mantine-color-blue-6)",
-};
-
 function formatMarkerTime(offsetSec: number): string {
   const m = Math.floor(offsetSec / 60);
   const s = offsetSec - m * 60;
@@ -128,7 +123,7 @@ function MarkerLinkChip({ node }: NodeViewProps) {
       as="span"
       onClick={onClick}
       title={tooltip}
-      style={inlineStyle(categoryColor[marker.category])}
+      style={inlineStyle(`var(--mantine-color-${markerDisplayColor(marker)}-6)`)}
     >
       📍 {formatMarkerTime(marker.runOffsetSec)}
       {marker.label ? ` ${marker.label}` : null}

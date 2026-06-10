@@ -455,7 +455,7 @@ paths:
     get:
       tags: [teams, markers]
       operationId: getTeamMarkerStats
-      summary: チーム配下 Run の Marker カテゴリ別件数
+      summary: チーム配下 Run の Marker 種別別件数
       description: |
         対戦相手スカウト用。Phase 2 のマッチアップビューで使う。
       responses:
@@ -1616,15 +1616,16 @@ paths:
       operationId: listMarkers
       summary: Run の Marker 一覧
       parameters:
-        - name: category
+        - name: markerTypeIds
           in: query
-          description: 複数指定可（カンマ区切り）
+          description: Marker 種別 ID で絞り込み（カンマ区切り、OR 条件）
           required: false
           explode: false
           schema:
             type: array
             items:
-              $ref: "#/components/schemas/MarkerCategory"
+              type: string
+              format: uuid
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses:
@@ -1703,6 +1704,81 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  # ---------- Marker types (大会ごと) ----------
+  /tournaments/{tournamentId}/marker-types:
+    parameters:
+      - $ref: "#/components/parameters/TournamentId"
+    get:
+      tags: [markers]
+      operationId: listMarkerTypes
+      summary: 大会の Marker 種別一覧
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarkerTypeList"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      tags: [markers]
+      operationId: createMarkerType
+      summary: Marker 種別作成
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMarkerTypeRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarkerType"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+
+  /marker-types/{markerTypeId}:
+    parameters:
+      - $ref: "#/components/parameters/MarkerTypeId"
+    patch:
+      tags: [markers]
+      operationId: updateMarkerType
+      summary: Marker 種別更新
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMarkerTypeRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarkerType"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+    delete:
+      tags: [markers]
+      operationId: deleteMarkerType
+      summary: Marker 種別削除（紐づく Marker は種別なしになる）
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   # ---------- Search ----------
   /search/runs:
     get:
@@ -1711,7 +1787,7 @@ paths:
       summary: Run の横断検索
       description: |
         spec-devflow.md §9 で扱う Phase 1 の検索条件。
-        期間 / Robot / Scenario / tags / Marker category / memo の組合せで Run を絞り込む。
+        期間 / Robot / Scenario / tags / Marker 種別 / memo の組合せで Run を絞り込む。
       parameters:
         - name: tournamentId
           in: query
@@ -1753,15 +1829,16 @@ paths:
             items:
               type: string
               format: uuid
-        - name: markerCategories
+        - name: markerTypeIds
           in: query
-          description: 含まれている Marker のカテゴリ（カンマ区切り、OR 条件）
+          description: 含まれている Marker の種別 ID（カンマ区切り、OR 条件）
           required: false
           explode: false
           schema:
             type: array
             items:
-              $ref: "#/components/schemas/MarkerCategory"
+              type: string
+              format: uuid
         - name: q
           in: query
           description: memo の全文検索（pg_trgm）
@@ -2155,6 +2232,13 @@ components:
       schema:
         type: string
         format: uuid
+    MarkerTypeId:
+      name: markerTypeId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     TournamentId:
       name: tournamentId
       in: path
@@ -2257,10 +2341,67 @@ components:
       enum: [practice, pre_match]
       description: Session の表示モードヒント
 
-    MarkerCategory:
-      type: string
-      enum: [success, failure, note]
-      description: Marker のカテゴリ。spec の `success | failure | note` を採用
+    MarkerType:
+      type: object
+      required: [id, tournamentId, name, color, sortOrder, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tournamentId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        color:
+          type: string
+          description: Mantine カラーキー（例 teal / red / blue）
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+    MarkerTypeRef:
+      type: object
+      description: Marker に展開された種別の参照（一覧/取得時の表示用）
+      required: [id, name, color]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        color:
+          type: string
+    MarkerTypeList:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/MarkerType"
+    CreateMarkerTypeRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        color:
+          type: string
+          default: blue
+        sortOrder:
+          type: integer
+          default: 0
+    UpdateMarkerTypeRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        color:
+          type: string
+        sortOrder:
+          type: integer
 
     # ---------- User ----------
     AuthConfig:
@@ -3153,7 +3294,7 @@ components:
     # ---------- Marker ----------
     Marker:
       type: object
-      required: [id, runId, runOffsetSec, label, category, createdAt]
+      required: [id, runId, runOffsetSec, label, markerTypeId, createdAt]
       properties:
         id:
           type: string
@@ -3169,22 +3310,31 @@ components:
           description: Run 開始からの秒数（spec §3.4）
         label:
           type: string
-        category:
-          $ref: "#/components/schemas/MarkerCategory"
+        markerTypeId:
+          type: [string, "null"]
+          format: uuid
+          description: 紐づく Marker 種別 ID（種別なしの場合 null）
+        markerType:
+          oneOf:
+            - $ref: "#/components/schemas/MarkerTypeRef"
+            - type: "null"
+          description: 展開された種別（種別なしの場合 null）
         createdAt:
           type: string
           format: date-time
     CreateMarkerRequest:
       type: object
-      required: [runOffsetSec, category]
+      required: [runOffsetSec]
       properties:
         runOffsetSec:
           type: integer
         label:
           type: string
           default: ""
-        category:
-          $ref: "#/components/schemas/MarkerCategory"
+        markerTypeId:
+          type: [string, "null"]
+          format: uuid
+          description: 種別なしの場合は省略または null
     UpdateMarkerRequest:
       type: object
       properties:
@@ -3192,8 +3342,10 @@ components:
           type: integer
         label:
           type: string
-        category:
-          $ref: "#/components/schemas/MarkerCategory"
+        markerTypeId:
+          type: [string, "null"]
+          format: uuid
+          description: 指定すると種別を変更（null で種別なしにクリア）。省略時は変更なし
     MarkerList:
       type: object
       required: [data, pagination]
@@ -3204,19 +3356,31 @@ components:
             $ref: "#/components/schemas/Marker"
         pagination:
           $ref: "#/components/schemas/Pagination"
+    TeamMarkerTypeCount:
+      type: object
+      required: [markerTypeId, name, color, count]
+      properties:
+        markerTypeId:
+          type: [string, "null"]
+          format: uuid
+          description: 種別なしマーカーの集計は null
+        name:
+          type: [string, "null"]
+        color:
+          type: [string, "null"]
+        count:
+          type: integer
     TeamMarkerStats:
       type: object
-      required: [teamId, success, failure, note]
+      required: [teamId, data]
       properties:
         teamId:
           type: string
           format: uuid
-        success:
-          type: integer
-        failure:
-          type: integer
-        note:
-          type: integer
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamMarkerTypeCount"
 
     # ---------- Tournament (Phase 2) ----------
     Tournament:

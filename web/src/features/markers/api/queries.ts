@@ -2,9 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   type CreateMarkerRequest,
-  type MarkerCategory,
+  type CreateMarkerTypeRequest,
   type MarkerListParams,
   type UpdateMarkerRequest,
+  type UpdateMarkerTypeRequest,
+  markerTypesApi,
   markersApi,
 } from "../../../lib/api/client";
 import { queryKeys } from "../../../lib/api/queryKeys";
@@ -51,4 +53,40 @@ export const useMarker = (id: string | null | undefined) =>
     enabled: !!id,
   });
 
-export const markerCategories: MarkerCategory[] = ["success", "failure", "note"];
+// ---- Marker types (大会ごと) ----
+
+export const useMarkerTypes = (tournamentId: string | null | undefined) =>
+  useQuery({
+    queryKey: queryKeys.markerTypes(tournamentId ?? ""),
+    queryFn: () => markerTypesApi.list(tournamentId as string),
+    enabled: !!tournamentId,
+  });
+
+export const useCreateMarkerType = (tournamentId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateMarkerTypeRequest) =>
+      markerTypesApi.create(tournamentId, body),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.markerTypes(tournamentId) }),
+  });
+};
+
+export const useUpdateMarkerType = (tournamentId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: UpdateMarkerTypeRequest }) =>
+      markerTypesApi.update(id, body),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.markerTypes(tournamentId) }),
+  });
+};
+
+export const useDeleteMarkerType = (tournamentId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => markerTypesApi.remove(id),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.markerTypes(tournamentId) }),
+  });
+};

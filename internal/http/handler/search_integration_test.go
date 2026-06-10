@@ -37,9 +37,10 @@ func TestSearchRunsCombinedFilters(t *testing.T) {
 	r2 := create("2026-05-02T09:00:00Z", "bad weather", []string{deps.TagID, tagB.ID})
 	r3 := create("2026-05-03T09:00:00Z", "ok", nil)
 
-	// Add a success marker on r2.
+	// Add a Vゴール marker on r2.
+	vgoal := createMarkerType(t, env, deps.TournamentID, "Vゴール", "teal")
 	rec = env.do(t, http.MethodPost, "/runs/"+r2+"/markers",
-		map[string]any{"runOffsetSec": 1, "category": "success"}, nil)
+		map[string]any{"runOffsetSec": 1, "markerTypeId": vgoal.ID}, nil)
 	mustStatus(t, rec, http.StatusCreated)
 
 	tq := "tournamentId=" + deps.TournamentID
@@ -67,8 +68,8 @@ func TestSearchRunsCombinedFilters(t *testing.T) {
 		t.Errorf("tag AND: %+v", list.Data)
 	}
 
-	// markerCategories OR — r2 has success
-	rec = env.do(t, http.MethodGet, "/search/runs?"+tq+"&markerCategories=success,failure", nil, &list)
+	// markerTypeIds OR — r2 has the Vゴール marker
+	rec = env.do(t, http.MethodGet, "/search/runs?"+tq+"&markerTypeIds="+vgoal.ID, nil, &list)
 	mustStatus(t, rec, http.StatusOK)
 	if len(list.Data) != 1 || list.Data[0].ID != r2 {
 		t.Errorf("marker filter: %+v", list.Data)

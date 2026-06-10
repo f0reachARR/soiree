@@ -99,9 +99,16 @@ export type MatchList = components["schemas"]["MatchList"];
 
 export type Marker = components["schemas"]["Marker"];
 export type MarkerList = components["schemas"]["MarkerList"];
-export type MarkerCategory = components["schemas"]["MarkerCategory"];
 export type CreateMarkerRequest = components["schemas"]["CreateMarkerRequest"];
 export type UpdateMarkerRequest = components["schemas"]["UpdateMarkerRequest"];
+
+export type MarkerType = components["schemas"]["MarkerType"];
+export type MarkerTypeRef = components["schemas"]["MarkerTypeRef"];
+export type MarkerTypeList = components["schemas"]["MarkerTypeList"];
+export type CreateMarkerTypeRequest =
+  components["schemas"]["CreateMarkerTypeRequest"];
+export type UpdateMarkerTypeRequest =
+  components["schemas"]["UpdateMarkerTypeRequest"];
 
 export type AuthConfig = components["schemas"]["AuthConfig"];
 
@@ -473,7 +480,7 @@ export type SearchRunsParams = PageParams & {
   robotId?: string;
   scenarioId?: string;
   tagIds?: string[];
-  markerCategories?: MarkerCategory[];
+  markerTypeIds?: string[];
   q?: string;
 };
 export const searchApi = {
@@ -488,9 +495,9 @@ export const searchApi = {
         robotId: p.robotId,
         scenarioId: p.scenarioId,
         tagIds: p.tagIds && p.tagIds.length > 0 ? p.tagIds.join(",") : undefined,
-        markerCategories:
-          p.markerCategories && p.markerCategories.length > 0
-            ? p.markerCategories.join(",")
+        markerTypeIds:
+          p.markerTypeIds && p.markerTypeIds.length > 0
+            ? p.markerTypeIds.join(",")
             : undefined,
         q: p.q,
       })}`,
@@ -580,7 +587,7 @@ export const matchesApi = {
 
 // ---- Markers ----
 export type MarkerListParams = PageParams & {
-  category?: MarkerCategory[];
+  markerTypeIds?: string[];
 };
 export const markersApi = {
   list: (runId: string, p: MarkerListParams = {}) =>
@@ -588,7 +595,10 @@ export const markersApi = {
       `/runs/${runId}/markers${qs({
         cursor: p.cursor,
         limit: p.limit,
-        category: p.category && p.category.length > 0 ? p.category.join(",") : undefined,
+        markerTypeIds:
+          p.markerTypeIds && p.markerTypeIds.length > 0
+            ? p.markerTypeIds.join(",")
+            : undefined,
       })}`,
     ),
   get: (markerId: string) => request<Marker>(`/markers/${markerId}`),
@@ -598,4 +608,22 @@ export const markersApi = {
     request<Marker>(`/markers/${markerId}`, { method: "PATCH", json: body }),
   remove: (markerId: string) =>
     request<void>(`/markers/${markerId}`, { method: "DELETE" }),
+};
+
+// ---- Marker types (大会ごと) ----
+export const markerTypesApi = {
+  list: (tournamentId: string) =>
+    request<MarkerTypeList>(`/tournaments/${tournamentId}/marker-types`),
+  create: (tournamentId: string, body: CreateMarkerTypeRequest) =>
+    request<MarkerType>(`/tournaments/${tournamentId}/marker-types`, {
+      method: "POST",
+      json: body,
+    }),
+  update: (markerTypeId: string, body: UpdateMarkerTypeRequest) =>
+    request<MarkerType>(`/marker-types/${markerTypeId}`, {
+      method: "PATCH",
+      json: body,
+    }),
+  remove: (markerTypeId: string) =>
+    request<void>(`/marker-types/${markerTypeId}`, { method: "DELETE" }),
 };

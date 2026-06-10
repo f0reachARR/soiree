@@ -9,19 +9,18 @@ import {
 } from "@mantine/core";
 import { useForm } from "@tanstack/react-form";
 
-import type { MarkerCategory } from "../../../lib/api/client";
-import { markerCategories } from "../api/queries";
-import { markerCategoryLabel } from "../lib/category";
+import type { MarkerType } from "../../../lib/api/client";
 
 export type MarkerPayload = {
   runOffsetSec: number;
   label: string;
-  category: MarkerCategory;
+  markerTypeId: string | null;
 };
 
 export function MarkerEditModal({
   mode,
   initial,
+  markerTypes,
   durationSec,
   onClose,
   onSubmit,
@@ -29,6 +28,7 @@ export function MarkerEditModal({
 }: {
   mode: "create" | "edit";
   initial: MarkerPayload;
+  markerTypes: MarkerType[];
   durationSec: number;
   onClose: () => void;
   onSubmit: (body: MarkerPayload) => void;
@@ -40,7 +40,7 @@ export function MarkerEditModal({
       onSubmit({
         runOffsetSec: Math.max(0, Math.round(value.runOffsetSec)),
         label: value.label,
-        category: value.category,
+        markerTypeId: value.markerTypeId,
       });
     },
   });
@@ -72,16 +72,18 @@ export function MarkerEditModal({
               />
             )}
           </form.Field>
-          <form.Field name="category">
+          <form.Field name="markerTypeId">
             {(field) => (
               <Select
-                label="Category"
-                data={markerCategories.map((c) => ({
-                  value: c,
-                  label: markerCategoryLabel[c],
+                label="種別"
+                placeholder="種別なし"
+                clearable
+                data={markerTypes.map((t) => ({
+                  value: t.id,
+                  label: t.name,
                 }))}
                 value={field.state.value}
-                onChange={(v) => v && field.handleChange(v as MarkerCategory)}
+                onChange={(v) => field.handleChange(v)}
               />
             )}
           </form.Field>

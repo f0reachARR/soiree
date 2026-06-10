@@ -15,6 +15,7 @@ import {
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
 import { ApiError } from "../../lib/api/client";
+import { MarkerTypesEditor } from "../../features/markers/components/MarkerTypesEditor";
 import { useTournament } from "../../features/tournaments/api/queries";
 import { TournamentRobotsEditor } from "../../features/tournaments/components/TournamentRobotsEditor";
 import { TournamentTeamsEditor } from "../../features/tournaments/components/TournamentTeamsEditor";
@@ -91,6 +92,11 @@ function TournamentDetailPage() {
         <Grid.Col span={{ base: 12, md: 7 }}>
           <Card withBorder padding="md">
             <TournamentRobotsEditor tournamentId={t.id} />
+          </Card>
+        </Grid.Col>
+        <Grid.Col span={12}>
+          <Card withBorder padding="md">
+            <MarkerTypesEditor tournamentId={t.id} />
           </Card>
         </Grid.Col>
       </Grid>

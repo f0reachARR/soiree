@@ -122,6 +122,7 @@ function RunDetailPage() {
 
       <MarkersSection
         runId={r.id}
+        tournamentId={r.tournamentId}
         currentSec={t}
         durationSec={runDurationSec}
         onSeek={(s) => seekRef.current(s)}

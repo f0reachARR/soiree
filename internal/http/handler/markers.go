@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -48,31 +49,56 @@ func (h *Markers) publish(runID string, payload any) {
 	h.Hub.Publish("run:"+runID, raw)
 }
 
-type markerDTO struct {
-	ID           string    `json:"id"`
-	RunID        string    `json:"runId"`
-	AuthorID     *string   `json:"authorId"`
-	RunOffsetSec int32     `json:"runOffsetSec"`
-	Label        string    `json:"label"`
-	Category     string    `json:"category"`
-	CreatedAt    time.Time `json:"createdAt"`
+type markerTypeRef struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Color string `json:"color"`
 }
 
-func toMarkerDTO(m sqlc.Marker) markerDTO {
+type markerDTO struct {
+	ID           string         `json:"id"`
+	RunID        string         `json:"runId"`
+	AuthorID     *string        `json:"authorId"`
+	RunOffsetSec int32          `json:"runOffsetSec"`
+	Label        string         `json:"label"`
+	MarkerTypeID *string        `json:"markerTypeId"`
+	MarkerType   *markerTypeRef `json:"markerType"`
+	CreatedAt    time.Time      `json:"createdAt"`
+}
+
+// markerDTOFrom builds the DTO from the joined fields shared by GetMarkerRow
+// and ListMarkersByRunRow. typeName/typeColor are nil when the marker has no
+// type (LEFT JOIN miss).
+func markerDTOFrom(id, runID, authorID, typeID pgtype.UUID, runOffset int32, label string, createdAt time.Time, typeName, typeColor *string) markerDTO {
 	var author *string
-	if m.AuthorID.Valid {
-		s := uuidString(m.AuthorID)
+	if authorID.Valid {
+		s := uuidString(authorID)
 		author = &s
 	}
-	return markerDTO{
-		ID:           uuidString(m.ID),
-		RunID:        uuidString(m.RunID),
+	dto := markerDTO{
+		ID:           uuidString(id),
+		RunID:        uuidString(runID),
 		AuthorID:     author,
-		RunOffsetSec: m.RunOffsetSec,
-		Label:        m.Label,
-		Category:     string(m.Category),
-		CreatedAt:    m.CreatedAt.Time,
+		RunOffsetSec: runOffset,
+		Label:        label,
+		CreatedAt:    createdAt,
 	}
+	if typeID.Valid {
+		s := uuidString(typeID)
+		dto.MarkerTypeID = &s
+		if typeName != nil && typeColor != nil {
+			dto.MarkerType = &markerTypeRef{ID: s, Name: *typeName, Color: *typeColor}
+		}
+	}
+	return dto
+}
+
+func getMarkerRowToDTO(m sqlc.GetMarkerRow) markerDTO {
+	return markerDTOFrom(m.ID, m.RunID, m.AuthorID, m.MarkerTypeID, m.RunOffsetSec, m.Label, m.CreatedAt.Time, m.MarkerTypeName, m.MarkerTypeColor)
+}
+
+func listMarkerRowToDTO(m sqlc.ListMarkersByRunRow) markerDTO {
+	return markerDTOFrom(m.ID, m.RunID, m.AuthorID, m.MarkerTypeID, m.RunOffsetSec, m.Label, m.CreatedAt.Time, m.MarkerTypeName, m.MarkerTypeColor)
 }
 
 type markerListResponse struct {
@@ -81,15 +107,15 @@ type markerListResponse struct {
 }
 
 type createMarkerRequest struct {
-	RunOffsetSec int32  `json:"runOffsetSec"`
-	Label        string `json:"label"`
-	Category     string `json:"category"`
+	RunOffsetSec int32   `json:"runOffsetSec"`
+	Label        string  `json:"label"`
+	MarkerTypeID *string `json:"markerTypeId"`
 }
 
 type updateMarkerRequest struct {
-	RunOffsetSec *int32  `json:"runOffsetSec"`
-	Label        *string `json:"label"`
-	Category     *string `json:"category"`
+	RunOffsetSec *int32           `json:"runOffsetSec"`
+	Label        *string          `json:"label"`
+	MarkerTypeID Optional[string] `json:"markerTypeId"`
 }
 
 // markerCursor encodes "<offset>|<uuid>" as base64 — markers are ordered by
@@ -123,12 +149,27 @@ func decodeMarkerCursor(s string) (*int32, pgtype.UUID, error) {
 	return &off, id, nil
 }
 
-func parseMarkerCategory(s string) (sqlc.MarkerCategory, error) {
-	switch sqlc.MarkerCategory(s) {
-	case sqlc.MarkerCategorySuccess, sqlc.MarkerCategoryFailure, sqlc.MarkerCategoryNote:
-		return sqlc.MarkerCategory(s), nil
+// resolveMarkerType validates that the given marker type id exists and belongs
+// to the run's tournament. Returns a NULL UUID when raw is nil/empty.
+func (h *Markers) resolveMarkerType(ctx context.Context, raw *string, tournamentID pgtype.UUID) (pgtype.UUID, error) {
+	if raw == nil || *raw == "" {
+		return pgtype.UUID{}, nil
 	}
-	return "", fmt.Errorf("invalid category %q", s)
+	id, err := parseUUIDParam(*raw)
+	if err != nil {
+		return pgtype.UUID{}, fmt.Errorf("invalid markerTypeId")
+	}
+	mt, err := h.Q.GetMarkerType(ctx, id)
+	if err != nil {
+		if isNoRows(err) {
+			return pgtype.UUID{}, fmt.Errorf("marker type not found")
+		}
+		return pgtype.UUID{}, err
+	}
+	if mt.TournamentID != tournamentID {
+		return pgtype.UUID{}, fmt.Errorf("marker type belongs to a different tournament")
+	}
+	return id, nil
 }
 
 func currentAuthorID(r *http.Request) pgtype.UUID {
@@ -159,19 +200,19 @@ func (h *Markers) List(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, err.Error())
 		return
 	}
-	var cats []string
-	if raw := r.URL.Query().Get("category"); raw != "" {
+	var typeIDs []pgtype.UUID
+	if raw := r.URL.Query().Get("markerTypeIds"); raw != "" {
 		for _, c := range strings.Split(raw, ",") {
 			c = strings.TrimSpace(c)
 			if c == "" {
 				continue
 			}
-			mc, err := parseMarkerCategory(c)
+			id, err := parseUUIDParam(c)
 			if err != nil {
-				badRequest(w, err.Error())
+				badRequest(w, "invalid markerTypeId")
 				return
 			}
-			cats = append(cats, string(mc))
+			typeIDs = append(typeIDs, id)
 		}
 	}
 	rows, err := h.Q.ListMarkersByRun(r.Context(), sqlc.ListMarkersByRunParams{
@@ -179,18 +220,18 @@ func (h *Markers) List(w http.ResponseWriter, r *http.Request) {
 		RunID:           runID,
 		CursorRunOffset: cursorOff,
 		CursorID:        cursorID,
-		Categories:      cats,
+		MarkerTypeIds:   typeIDs,
 	})
 	if err != nil {
 		internalError(w, err)
 		return
 	}
-	page, pg := paginate(rows, limit, func(m sqlc.Marker) string {
+	page, pg := paginate(rows, limit, func(m sqlc.ListMarkersByRunRow) string {
 		return encodeMarkerCursor(m.RunOffsetSec, m.ID)
 	})
 	out := make([]markerDTO, len(page))
 	for i, m := range page {
-		out[i] = toMarkerDTO(m)
+		out[i] = listMarkerRowToDTO(m)
 	}
 	writeJSON(w, http.StatusOK, markerListResponse{Data: out, Pagination: pg})
 }
@@ -210,7 +251,7 @@ func (h *Markers) Get(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, toMarkerDTO(m))
+	writeJSON(w, http.StatusOK, getMarkerRowToDTO(m))
 }
 
 func (h *Markers) Create(w http.ResponseWriter, r *http.Request) {
@@ -219,7 +260,8 @@ func (h *Markers) Create(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "invalid runId")
 		return
 	}
-	if _, err := h.Q.GetRun(r.Context(), runID); err != nil {
+	run, err := h.Q.GetRun(r.Context(), runID)
+	if err != nil {
 		if isNoRows(err) {
 			notFound(w, "run not found")
 			return
@@ -232,30 +274,33 @@ func (h *Markers) Create(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, err.Error())
 		return
 	}
-	if req.Category == "" {
-		req.Category = string(sqlc.MarkerCategoryNote)
-	}
-	cat, err := parseMarkerCategory(req.Category)
-	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, "validation", err.Error(), nil)
-		return
-	}
 	if req.RunOffsetSec < 0 {
 		writeError(w, http.StatusUnprocessableEntity, "validation", "runOffsetSec must be >= 0", nil)
 		return
 	}
-	m, err := h.Q.CreateMarker(r.Context(), sqlc.CreateMarkerParams{
+	typeID, err := h.resolveMarkerType(r.Context(), req.MarkerTypeID, run.TournamentID)
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, "validation", err.Error(), nil)
+		return
+	}
+	created, err := h.Q.CreateMarker(r.Context(), sqlc.CreateMarkerParams{
 		RunID:        runID,
 		AuthorID:     currentAuthorID(r),
 		RunOffsetSec: req.RunOffsetSec,
 		Label:        req.Label,
-		Category:     cat,
+		MarkerTypeID: typeID,
 	})
 	if err != nil {
 		internalError(w, err)
 		return
 	}
-	dto := toMarkerDTO(m)
+	// Re-read through GetMarker so the response carries the joined type ref.
+	m, err := h.Q.GetMarker(r.Context(), created.ID)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	dto := getMarkerRowToDTO(m)
 	h.publish(uuidString(runID), markerEvent{Type: "marker.created", RunID: uuidString(runID), Marker: dto})
 	writeJSON(w, http.StatusCreated, dto)
 }
@@ -271,21 +316,37 @@ func (h *Markers) Update(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, err.Error())
 		return
 	}
-	params := sqlc.UpdateMarkerParams{ID: id, RunOffsetSec: req.RunOffsetSec, Label: req.Label}
 	if req.RunOffsetSec != nil && *req.RunOffsetSec < 0 {
 		writeError(w, http.StatusUnprocessableEntity, "validation", "runOffsetSec must be >= 0", nil)
 		return
 	}
-	if req.Category != nil {
-		cat, err := parseMarkerCategory(*req.Category)
+	params := sqlc.UpdateMarkerParams{ID: id, RunOffsetSec: req.RunOffsetSec, Label: req.Label}
+	if req.MarkerTypeID.Set {
+		existing, err := h.Q.GetMarker(r.Context(), id)
 		if err != nil {
-			writeError(w, http.StatusUnprocessableEntity, "validation", err.Error(), nil)
+			if isNoRows(err) {
+				notFound(w, "marker not found")
+				return
+			}
+			internalError(w, err)
 			return
 		}
-		params.Category = sqlc.NullMarkerCategory{MarkerCategory: cat, Valid: true}
+		run, err := h.Q.GetRun(r.Context(), existing.RunID)
+		if err != nil {
+			internalError(w, err)
+			return
+		}
+		params.SetMarkerType = true
+		if !req.MarkerTypeID.Null {
+			typeID, err := h.resolveMarkerType(r.Context(), &req.MarkerTypeID.Value, run.TournamentID)
+			if err != nil {
+				writeError(w, http.StatusUnprocessableEntity, "validation", err.Error(), nil)
+				return
+			}
+			params.MarkerTypeID = typeID
+		}
 	}
-	m, err := h.Q.UpdateMarker(r.Context(), params)
-	if err != nil {
+	if _, err := h.Q.UpdateMarker(r.Context(), params); err != nil {
 		if isNoRows(err) {
 			notFound(w, "marker not found")
 			return
@@ -293,7 +354,12 @@ func (h *Markers) Update(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
-	dto := toMarkerDTO(m)
+	m, err := h.Q.GetMarker(r.Context(), id)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	dto := getMarkerRowToDTO(m)
 	h.publish(dto.RunID, markerEvent{Type: "marker.updated", RunID: dto.RunID, Marker: dto})
 	writeJSON(w, http.StatusOK, dto)
 }
