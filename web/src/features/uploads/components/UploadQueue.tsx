@@ -1,35 +1,21 @@
-import {
-  ActionIcon,
-  Button,
-  Group,
-  Progress,
-  Stack,
-  Text,
-  Title,
-} from "@mantine/core";
+import { ActionIcon, Group, Progress, Stack, Text } from "@mantine/core";
 
-import { formatRate, type UploadItem } from "../hooks/useTusUpload";
+import { formatRate, type UploadItem } from "../store/uploadStore";
 
+// Renders just the per-file progress rows. The surrounding chrome (title,
+// collapse, clear button) is owned by the container — see GlobalUploadQueue.
 export function UploadQueue({
   uploads,
   onCancel,
   onRetry,
-  onClearFinished,
 }: {
   uploads: UploadItem[];
   onCancel: (id: string) => void;
   onRetry: (id: string) => void;
-  onClearFinished: () => void;
 }) {
   if (uploads.length === 0) return null;
   return (
     <Stack gap="xs">
-      <Group justify="space-between">
-        <Title order={5}>アップロード状況 ({uploads.length})</Title>
-        <Button size="xs" variant="subtle" onClick={onClearFinished}>
-          完了/失敗をクリア
-        </Button>
-      </Group>
       {uploads.map((u) => (
         <Group key={u.id} gap="md" wrap="nowrap">
           <Text size="sm" flex={1} truncate>

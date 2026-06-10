@@ -21,6 +21,7 @@ import {
 
 import { AuthGate } from "../features/auth/components/AuthGate";
 import { SessionMenu } from "../features/auth/components/SessionMenu";
+import { GlobalUploadQueue } from "../features/uploads/components/GlobalUploadQueue";
 import { TournamentSelector } from "../features/tournaments/components/TournamentSelector";
 import { BottomTabBar } from "../components/layout/BottomTabBar";
 import {
@@ -115,6 +116,7 @@ function AuthenticatedLayout() {
       <AppShell.Footer p={0}>
         <BottomTabBar />
       </AppShell.Footer>
+      <GlobalUploadQueue />
     </AppShell>
   );
 }
