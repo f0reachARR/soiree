@@ -97,10 +97,14 @@ func (w *PlanHLSWorker) Work(ctx context.Context, job *river.Job[PlanHLSArgs]) e
 		bw := s.bandwidthBps
 		playlistKey := fmt.Sprintf("hls/%s/%s/playlist.m3u8", v.ID.String(), string(s.kind))
 
+		// We always re-encode, even the original-resolution rendition. `-c copy`
+		// passthrough is intentionally disabled: it produced fragile playlists
+		// for some source codecs/profiles, so the original is now transcoded at
+		// its source resolution like every other rendition.
 		rend, err := w.Q.InsertRendition(ctx, sqlc.InsertRenditionParams{
 			VideoID:      pgID,
 			Kind:         s.kind,
-			Passthrough:  s.kind == sqlc.RenditionKindOriginal && v.PassthroughOk,
+			Passthrough:  false,
 			Width:        width,
 			Height:       height,
 			BandwidthBps: &bw,
