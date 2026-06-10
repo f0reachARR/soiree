@@ -62,7 +62,7 @@ func (h *WS) serveSubscribe(w http.ResponseWriter, r *http.Request, topic string
 		slog.Warn("ws accept failed", "error", err, "topic", topic)
 		return
 	}
-	defer c.CloseNow()
+	defer func() { _ = c.CloseNow() }()
 
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()

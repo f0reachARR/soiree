@@ -35,10 +35,10 @@ func createBasicRun(t *testing.T, env *testEnv) (runID, userID string) {
 
 	var run runResp
 	rec = env.do(t, http.MethodPost, "/runs", map[string]any{
-		"sessionId":  deps.SessionID,
-		"teamId":     deps.TeamID,
-		"robotId":    deps.RobotID,
-		"scenarioId": deps.ScenarioID,
+		"sessionId":   deps.SessionID,
+		"teamId":      deps.TeamID,
+		"robotId":     deps.RobotID,
+		"scenarioId":  deps.ScenarioID,
 		"startedAt":   "2026-05-01T10:00:00Z",
 		"durationSec": 90,
 	}, &run)

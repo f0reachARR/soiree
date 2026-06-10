@@ -16,14 +16,14 @@ type runVideoResp struct {
 }
 
 type runResp struct {
-	ID         string         `json:"id"`
-	SessionID  string         `json:"sessionId"`
-	Score      *float64       `json:"score"`
-	Memo       string         `json:"memo"`
-	Videos     []runVideoResp `json:"videos"`
-	TagIDs     []string       `json:"tagIds"`
-	StartedAt  time.Time      `json:"startedAt"`
-	EndedAt    time.Time      `json:"endedAt"`
+	ID        string         `json:"id"`
+	SessionID string         `json:"sessionId"`
+	Score     *float64       `json:"score"`
+	Memo      string         `json:"memo"`
+	Videos    []runVideoResp `json:"videos"`
+	TagIDs    []string       `json:"tagIds"`
+	StartedAt time.Time      `json:"startedAt"`
+	EndedAt   time.Time      `json:"endedAt"`
 }
 
 // runDeps creates the masters needed to satisfy Run's foreign keys.
@@ -106,15 +106,15 @@ func TestRunsCRUDAndPatchSemantics(t *testing.T) {
 	// Create run with one tag and a numeric score.
 	var run runResp
 	rec := env.do(t, http.MethodPost, "/runs", map[string]any{
-		"sessionId":  deps.SessionID,
-		"teamId":     deps.TeamID,
-		"robotId":    deps.RobotID,
-		"scenarioId": deps.ScenarioID,
+		"sessionId":   deps.SessionID,
+		"teamId":      deps.TeamID,
+		"robotId":     deps.RobotID,
+		"scenarioId":  deps.ScenarioID,
 		"startedAt":   "2026-05-01T10:00:00Z",
 		"durationSec": 90,
 		"memo":        "hello",
-		"score":      42.5,
-		"tagIds":     []string{deps.TagID},
+		"score":       42.5,
+		"tagIds":      []string{deps.TagID},
 	}, &run)
 	mustStatus(t, rec, http.StatusCreated)
 	if run.Score == nil || *run.Score != 42.5 {
@@ -195,7 +195,7 @@ func TestRunsCreateValidatesUUIDs(t *testing.T) {
 		"teamId":     "00000000-0000-0000-0000-000000000000",
 		"robotId":    "00000000-0000-0000-0000-000000000000",
 		"scenarioId": "00000000-0000-0000-0000-000000000000",
-		"startedAt": "2026-05-01T10:00:00Z",
+		"startedAt":  "2026-05-01T10:00:00Z",
 	}, nil)
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Errorf("expected 422, got %d", rec.Code)

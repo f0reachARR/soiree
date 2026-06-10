@@ -230,10 +230,6 @@ type replaceTournamentTeamsRequest struct {
 	TeamIDs []string `json:"teamIds"`
 }
 
-type replaceTournamentRobotsRequest struct {
-	RobotIDs []string `json:"robotIds"`
-}
-
 func (h *Tournaments) tournamentExists(ctx context.Context, id pgtype.UUID) (bool, error) {
 	if _, err := h.Q.GetTournament(ctx, id); err != nil {
 		if isNoRows(err) {
@@ -307,7 +303,7 @@ func (h *Tournaments) ReplaceTeams(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
-	defer tx.Rollback(context.Background())
+	defer func() { _ = tx.Rollback(context.Background()) }()
 	qtx := h.Q.WithTx(tx)
 
 	// teams in the set ∆: clear-then-insert is simplest. tournament_robots

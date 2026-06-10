@@ -19,10 +19,10 @@ func TestTeamMarkerStatsAggregates(t *testing.T) {
 	// Create a second run on the same team to verify aggregation across runs.
 	var r2 runResp
 	rec := env.do(t, http.MethodPost, "/runs", map[string]any{
-		"sessionId":  deps.SessionID,
-		"teamId":     deps.TeamID,
-		"robotId":    deps.RobotID,
-		"scenarioId": deps.ScenarioID,
+		"sessionId":   deps.SessionID,
+		"teamId":      deps.TeamID,
+		"robotId":     deps.RobotID,
+		"scenarioId":  deps.ScenarioID,
 		"startedAt":   "2026-05-02T10:00:00Z",
 		"durationSec": 90,
 	}, &r2)
@@ -32,10 +32,10 @@ func TestTeamMarkerStatsAggregates(t *testing.T) {
 	// Use the run from seedRunDeps by creating one explicitly:
 	var r1 runResp
 	rec = env.do(t, http.MethodPost, "/runs", map[string]any{
-		"sessionId":  deps.SessionID,
-		"teamId":     deps.TeamID,
-		"robotId":    deps.RobotID,
-		"scenarioId": deps.ScenarioID,
+		"sessionId":   deps.SessionID,
+		"teamId":      deps.TeamID,
+		"robotId":     deps.RobotID,
+		"scenarioId":  deps.ScenarioID,
 		"startedAt":   "2026-05-01T10:00:00Z",
 		"durationSec": 90,
 	}, &r1)
@@ -66,7 +66,9 @@ func TestTeamMarkerStatsAggregates(t *testing.T) {
 func TestTeamMarkerStatsEmpty(t *testing.T) {
 	env := setupEnv(t)
 	// Team with no runs.
-	type idResp struct{ ID string `json:"id"` }
+	type idResp struct {
+		ID string `json:"id"`
+	}
 	var team idResp
 	rec := env.do(t, http.MethodPost, "/teams", map[string]any{"name": "Lonely"}, &team)
 	mustStatus(t, rec, http.StatusCreated)

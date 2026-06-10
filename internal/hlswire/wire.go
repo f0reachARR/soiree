@@ -90,8 +90,8 @@ type ProbeComplete struct {
 type EncodeClaim struct {
 	VideoID      string `json:"videoId"`
 	RenditionID  string `json:"renditionId"`
-	SourceURL    string `json:"sourceUrl"`    // presigned GET, long TTL (~6h)
-	HLSPrefix    string `json:"hlsPrefix"`    // "hls/<videoId>/<kind>/"
+	SourceURL    string `json:"sourceUrl"` // presigned GET, long TTL (~6h)
+	HLSPrefix    string `json:"hlsPrefix"` // "hls/<videoId>/<kind>/"
 	Passthrough  bool   `json:"passthrough"`
 	Width        int32  `json:"width,omitempty"`
 	Height       int32  `json:"height,omitempty"`

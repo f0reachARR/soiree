@@ -355,10 +355,10 @@ type renditionDTO struct {
 }
 
 type renditionListResponse struct {
-	VideoID     string          `json:"videoId"`
-	HLSStatus   string          `json:"hlsStatus"`
-	DurationSec *int32          `json:"durationSec"`
-	Data        []renditionDTO  `json:"data"`
+	VideoID     string         `json:"videoId"`
+	HLSStatus   string         `json:"hlsStatus"`
+	DurationSec *int32         `json:"durationSec"`
+	Data        []renditionDTO `json:"data"`
 }
 
 type encodingJobDTO struct {
@@ -496,7 +496,7 @@ func (h *Videos) HLSProxy(w http.ResponseWriter, r *http.Request) {
 		notFound(w, "hls object not found")
 		return
 	}
-	defer body.Close()
+	defer func() { _ = body.Close() }()
 	if ct == "" {
 		ct = contentTypeFor(rest)
 	}

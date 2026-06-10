@@ -25,15 +25,6 @@ type sessionCandidateListResp struct {
 	Data []sessionCandidateResp `json:"data"`
 }
 
-func mustTime(t *testing.T, s string) time.Time {
-	t.Helper()
-	v, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		t.Fatalf("parse time %q: %v", s, err)
-	}
-	return v
-}
-
 func TestSessionsPatchClearsLocation(t *testing.T) {
 	env := setupEnv(t)
 	tournamentID := env.createTournament(t, "T1")

@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+# Cancel superseded runs on the same ref (e.g. force-pushes to a PR).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint-go:
+    name: Lint (golangci-lint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12
+
+  lint-web:
+    name: Web typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter web typecheck
+
+  lint-openapi:
+    name: OpenAPI lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: ./scripts/lint-openapi.sh
+
+  codegen-drift:
+    name: Generated code drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Regenerate sqlc
+        run: ./scripts/gen-sqlc.sh
+      - name: Regenerate API client
+        run: ./scripts/gen-api-client.sh
+      - name: Fail if generated output is stale
+        run: |
+          if ! git diff --exit-code; then
+            echo "::error::Generated code is out of date. Run ./scripts/gen-sqlc.sh and ./scripts/gen-api-client.sh and commit the result."
+            exit 1
+          fi
+
+  test-go:
+    name: Go tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: video
+          POSTGRES_PASSWORD: video
+          POSTGRES_DB: soiree_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U video"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      TEST_DATABASE_URL: postgres://video:video@localhost:5432/soiree_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Install media tooling
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg libheif-examples
+      - name: Run tests
+        # -p 1 serializes packages: integration tests share one DB and TRUNCATE
+        # every table, so they are not safe to run concurrently.
+        run: go test -p 1 ./...

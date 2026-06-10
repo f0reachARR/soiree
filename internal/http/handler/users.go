@@ -35,7 +35,7 @@ type createUserRequest struct {
 }
 
 type updateUserRequest struct {
-	Name  *string         `json:"name"`
+	Name  *string          `json:"name"`
 	Color Optional[string] `json:"color"`
 }
 

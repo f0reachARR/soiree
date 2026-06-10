@@ -79,7 +79,7 @@ func RunHLS(ctx context.Context, opt HLSOptions, onSegment func(name string)) er
 	if err != nil {
 		return fmt.Errorf("fsnotify new: %w", err)
 	}
-	defer watcher.Close()
+	defer func() { _ = watcher.Close() }()
 	if err := watcher.Add(opt.OutDir); err != nil {
 		return fmt.Errorf("fsnotify add: %w", err)
 	}
