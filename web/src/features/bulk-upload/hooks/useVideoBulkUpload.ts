@@ -109,7 +109,7 @@ export function useVideoBulkUpload(params: UploadParams | null) {
       const upload = new Upload(sf.file, {
         endpoint: TUSD_ENDPOINT,
         retryDelays: [0, 1000, 3000, 5000, 10000],
-        chunkSize: 8 * 1024 * 1024,
+        chunkSize: 80 * 1024 * 1024,
         removeFingerprintOnSuccess: true,
         metadata: meta,
         onAfterResponse(_req, res) {
