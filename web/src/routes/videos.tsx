@@ -1,6 +1,6 @@
 import { Button, FileButton, Group, Select, Stack, Text } from "@mantine/core";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useState } from "react";
 
 import { ResourcePage } from "../components/layout/ResourcePage";
 import { useCurrentTournamentId } from "../stores/currentTournament";
@@ -8,9 +8,12 @@ import { useCurrentUserId } from "../stores/currentUser";
 import { useDevices } from "../features/devices/api/queries";
 import { useSessions } from "../features/sessions/api/queries";
 import { useVideos } from "../features/videos/api/queries";
-import { useTusUpload } from "../features/uploads/hooks/useTusUpload";
+import {
+  startUpload,
+  startUploadMany,
+  type UploadMeta,
+} from "../features/uploads/store/uploadStore";
 import { UploadDropzone } from "../features/uploads/components/UploadDropzone";
-import { UploadQueue } from "../features/uploads/components/UploadQueue";
 import { MobileCaptureButton } from "../features/uploads/components/MobileCaptureButton";
 import { VideoList } from "../features/videos/components/VideoList";
 import { selectOverlapping } from "../features/videos/lib/overlap";
@@ -35,20 +38,14 @@ function VideosPage() {
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  // useTusUpload's getMeta reads the latest selection at upload start, so we
-  // mirror the upload-time meta to refs to avoid resetting the hook when the
-  // user picks a different Session/Device between drops.
-  const metaRef = useRef({ deviceId, sessionId, currentUserId, currentTournamentId });
-  metaRef.current = { deviceId, sessionId, currentUserId, currentTournamentId };
-
-  const upload = useTusUpload({
-    getMeta: () => ({
-      tournamentId: metaRef.current.currentTournamentId,
-      deviceId: metaRef.current.deviceId,
-      sessionId: metaRef.current.sessionId,
-      uploaderId: metaRef.current.currentUserId,
-    }),
-    onSuccess: () => videos.refetch(),
+  // Uploads are owned by a module-level store so progress survives SPA
+  // navigation and is shown globally (see GlobalUploadQueue). Meta is captured
+  // at call time, so the latest Session/Device selection is always used.
+  const uploadMeta = (): UploadMeta => ({
+    tournamentId: currentTournamentId,
+    deviceId,
+    sessionId,
+    uploaderId: currentUserId,
   });
 
   const list = videos.data?.data ?? [];
@@ -91,24 +88,21 @@ function VideosPage() {
             size="sm"
           />
           <FileButton
-            onChange={(files) => files && upload.startUploadMany(files)}
+            onChange={(files) => files && startUploadMany(files, uploadMeta())}
             accept="video/*"
             multiple
           >
             {(props) => <Button {...props}>＋ 動画を選択</Button>}
           </FileButton>
-          <MobileCaptureButton onPicked={upload.startUpload} />
+          <MobileCaptureButton
+            onPicked={(file) => startUpload(file, uploadMeta())}
+          />
         </Group>
       }
     >
       <Stack>
-        <UploadDropzone onFiles={(files) => upload.startUploadMany(files)} />
-
-        <UploadQueue
-          uploads={upload.uploads}
-          onCancel={upload.cancelUpload}
-          onRetry={upload.retryUpload}
-          onClearFinished={upload.clearFinished}
+        <UploadDropzone
+          onFiles={(files) => startUploadMany(files, uploadMeta())}
         />
 
         {selected.size > 0 && (
