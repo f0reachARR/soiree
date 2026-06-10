@@ -25,6 +25,7 @@ import { AddRunVideoModal } from "../../features/runs/components/AddRunVideoModa
 import { RunVideosTable } from "../../features/runs/components/RunVideosTable";
 import { RecommendedVideos } from "../../features/runs/components/RecommendedVideos";
 import { RunMetadataEditor } from "../../features/runs/components/RunMetadataEditor";
+import { RunScoutingNote } from "../../features/runs/components/RunScoutingNote";
 import { RunRobotImagesStrip } from "../../features/robot-images/components/RunRobotImagesStrip";
 
 export const Route = createFileRoute("/runs/$runId")({
@@ -158,6 +159,8 @@ function RunDetailPage() {
         onSave={(body) => updateRun.mutate({ id: r.id, body })}
         saving={updateRun.isPending}
       />
+
+      <RunScoutingNote run={r} />
 
       {addVideoOpen && <AddRunVideoModal run={r} onClose={closeAddVideo} />}
     </Stack>
