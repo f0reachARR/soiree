@@ -63,7 +63,6 @@ function buildUpload(file: File, meta: UploadMeta, id: string): Upload {
     endpoint: TUSD_ENDPOINT,
     retryDelays: [0, 1000, 3000, 5000, 10000],
     chunkSize: 80 * 1024 * 1024,
-    parallelUploads: 4,
     // urlStorage default (localStorage) + removeFingerprintOnSuccess lets
     // an interrupted upload resume across page reloads.
     removeFingerprintOnSuccess: true,
