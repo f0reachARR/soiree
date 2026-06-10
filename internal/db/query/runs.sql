@@ -60,11 +60,11 @@ WHERE
   AND (sqlc.narg('robot_id')::uuid IS NULL OR r.robot_id = sqlc.narg('robot_id')::uuid)
   AND (sqlc.narg('scenario_id')::uuid IS NULL OR r.scenario_id = sqlc.narg('scenario_id')::uuid)
   AND (sqlc.narg('memo_q')::text IS NULL OR r.memo ILIKE '%' || sqlc.narg('memo_q')::text || '%')
-  AND (COALESCE(array_length(sqlc.narg('marker_categories')::text[], 1), 0) = 0
+  AND (COALESCE(array_length(sqlc.narg('marker_type_ids')::uuid[], 1), 0) = 0
        OR EXISTS (
          SELECT 1 FROM markers m
          WHERE m.run_id = r.id
-           AND m.category::text = ANY(sqlc.narg('marker_categories')::text[])
+           AND m.marker_type_id = ANY(sqlc.narg('marker_type_ids')::uuid[])
        ))
   AND (sqlc.arg('tag_count')::int = 0 OR (
          SELECT count(DISTINCT tag_id) FROM run_tags

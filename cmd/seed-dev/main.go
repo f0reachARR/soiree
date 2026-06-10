@@ -92,7 +92,40 @@ func run() error {
 	}
 	slog.Info("robot", "id", uuidStr(robot.ID), "name", robot.Name, "version", robot.Version)
 
+	// Sample Marker types so the run/marker UI is usable right after seeding.
+	markerTypes := []struct {
+		name  string
+		color string
+	}{
+		{"Vゴール", "teal"},
+		{"リトライ", "orange"},
+		{"脱輪", "red"},
+	}
+	for i, mt := range markerTypes {
+		if _, err := ensureMarkerType(ctx, q, tournament.ID, mt.name, mt.color, int32(i)); err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+func ensureMarkerType(ctx context.Context, q *sqlc.Queries, tournamentID pgtype.UUID, name, color string, sortOrder int32) (sqlc.MarkerType, error) {
+	types, err := q.ListMarkerTypesByTournament(ctx, tournamentID)
+	if err != nil {
+		return sqlc.MarkerType{}, err
+	}
+	for _, mt := range types {
+		if mt.Name == name {
+			return mt, nil
+		}
+	}
+	return q.CreateMarkerType(ctx, sqlc.CreateMarkerTypeParams{
+		TournamentID: tournamentID,
+		Name:         name,
+		Color:        color,
+		SortOrder:    sortOrder,
+	})
 }
 
 func ensureTournament(ctx context.Context, q *sqlc.Queries, name string) (sqlc.Tournament, error) {

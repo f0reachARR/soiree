@@ -232,11 +232,11 @@ WHERE
   AND ($5::uuid IS NULL OR r.robot_id = $5::uuid)
   AND ($6::uuid IS NULL OR r.scenario_id = $6::uuid)
   AND ($7::text IS NULL OR r.memo ILIKE '%' || $7::text || '%')
-  AND (COALESCE(array_length($8::text[], 1), 0) = 0
+  AND (COALESCE(array_length($8::uuid[], 1), 0) = 0
        OR EXISTS (
          SELECT 1 FROM markers m
          WHERE m.run_id = r.id
-           AND m.category::text = ANY($8::text[])
+           AND m.marker_type_id = ANY($8::uuid[])
        ))
   AND ($9::int = 0 OR (
          SELECT count(DISTINCT tag_id) FROM run_tags
@@ -250,18 +250,18 @@ LIMIT $1
 `
 
 type SearchRunsParams struct {
-	Limit            int32
-	TournamentID     pgtype.UUID
-	From             pgtype.Timestamptz
-	To               pgtype.Timestamptz
-	RobotID          pgtype.UUID
-	ScenarioID       pgtype.UUID
-	MemoQ            *string
-	MarkerCategories []string
-	TagCount         int32
-	TagIds           []pgtype.UUID
-	CursorStartedAt  pgtype.Timestamptz
-	CursorID         pgtype.UUID
+	Limit           int32
+	TournamentID    pgtype.UUID
+	From            pgtype.Timestamptz
+	To              pgtype.Timestamptz
+	RobotID         pgtype.UUID
+	ScenarioID      pgtype.UUID
+	MemoQ           *string
+	MarkerTypeIds   []pgtype.UUID
+	TagCount        int32
+	TagIds          []pgtype.UUID
+	CursorStartedAt pgtype.Timestamptz
+	CursorID        pgtype.UUID
 }
 
 func (q *Queries) SearchRuns(ctx context.Context, arg SearchRunsParams) ([]Run, error) {
@@ -273,7 +273,7 @@ func (q *Queries) SearchRuns(ctx context.Context, arg SearchRunsParams) ([]Run, 
 		arg.RobotID,
 		arg.ScenarioID,
 		arg.MemoQ,
-		arg.MarkerCategories,
+		arg.MarkerTypeIds,
 		arg.TagCount,
 		arg.TagIds,
 		arg.CursorStartedAt,

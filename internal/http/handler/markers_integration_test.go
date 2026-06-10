@@ -6,14 +6,21 @@ import (
 	"time"
 )
 
+type markerTypeRefResp struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Color string `json:"color"`
+}
+
 type markerResp struct {
-	ID           string    `json:"id"`
-	RunID        string    `json:"runId"`
-	AuthorID     *string   `json:"authorId"`
-	RunOffsetSec int32     `json:"runOffsetSec"`
-	Label        string    `json:"label"`
-	Category     string    `json:"category"`
-	CreatedAt    time.Time `json:"createdAt"`
+	ID           string             `json:"id"`
+	RunID        string             `json:"runId"`
+	AuthorID     *string            `json:"authorId"`
+	RunOffsetSec int32              `json:"runOffsetSec"`
+	Label        string             `json:"label"`
+	MarkerTypeID *string            `json:"markerTypeId"`
+	MarkerType   *markerTypeRefResp `json:"markerType"`
+	CreatedAt    time.Time          `json:"createdAt"`
 }
 
 type markerListResp struct {
@@ -24,7 +31,17 @@ type markerListResp struct {
 	} `json:"pagination"`
 }
 
-func createBasicRun(t *testing.T, env *testEnv) (runID, userID string) {
+type markerTypeResp struct {
+	ID           string `json:"id"`
+	TournamentID string `json:"tournamentId"`
+	Name         string `json:"name"`
+	Color        string `json:"color"`
+	SortOrder    int32  `json:"sortOrder"`
+}
+
+// createBasicRun seeds a run and an author user, returning their ids plus the
+// tournament the run lives under (needed to create marker types).
+func createBasicRun(t *testing.T, env *testEnv) (runID, userID, tournamentID string) {
 	t.Helper()
 	deps := seedRunDeps(t, env)
 
@@ -43,39 +60,54 @@ func createBasicRun(t *testing.T, env *testEnv) (runID, userID string) {
 		"durationSec": 90,
 	}, &run)
 	mustStatus(t, rec, http.StatusCreated)
-	return run.ID, user.ID
+	return run.ID, user.ID, deps.TournamentID
 }
 
-func TestMarkerCRUDAndCategoryFilter(t *testing.T) {
-	env := setupEnv(t)
-	runID, userID := createBasicRun(t, env)
+func createMarkerType(t *testing.T, env *testEnv, tournamentID, name, color string) markerTypeResp {
+	t.Helper()
+	var mt markerTypeResp
+	rec := env.do(t, http.MethodPost, "/tournaments/"+tournamentID+"/marker-types",
+		map[string]any{"name": name, "color": color}, &mt)
+	mustStatus(t, rec, http.StatusCreated)
+	return mt
+}
 
-	// Create with explicit category + label, authored via X-User-Id
+func TestMarkerCRUDAndTypeFilter(t *testing.T) {
+	env := setupEnv(t)
+	runID, userID, tournamentID := createBasicRun(t, env)
+
+	vgoal := createMarkerType(t, env, tournamentID, "Vゴール", "teal")
+	retry := createMarkerType(t, env, tournamentID, "リトライ", "red")
+
+	// Create with type + label, authored via X-User-Id
 	var m1 markerResp
 	rec := env.doWithHeaders(t, http.MethodPost, "/runs/"+runID+"/markers",
-		map[string]any{"runOffsetSec": 5, "label": "脱輪", "category": "failure"}, &m1,
+		map[string]any{"runOffsetSec": 5, "label": "脱輪", "markerTypeId": retry.ID}, &m1,
 		map[string]string{"X-User-Id": userID})
 	mustStatus(t, rec, http.StatusCreated)
-	if m1.Category != "failure" || m1.Label != "脱輪" || m1.RunOffsetSec != 5 {
+	if m1.MarkerTypeID == nil || *m1.MarkerTypeID != retry.ID || m1.Label != "脱輪" || m1.RunOffsetSec != 5 {
 		t.Errorf("create: %+v", m1)
+	}
+	if m1.MarkerType == nil || m1.MarkerType.Name != "リトライ" || m1.MarkerType.Color != "red" {
+		t.Errorf("expected expanded markerType, got %+v", m1.MarkerType)
 	}
 	if m1.AuthorID == nil || *m1.AuthorID != userID {
 		t.Errorf("expected authorId=%s got %v", userID, m1.AuthorID)
 	}
 
-	// Create without category defaults to "note"
+	// Create without a type → markerTypeId null (free-form note)
 	var m2 markerResp
 	rec = env.do(t, http.MethodPost, "/runs/"+runID+"/markers",
 		map[string]any{"runOffsetSec": 30}, &m2)
 	mustStatus(t, rec, http.StatusCreated)
-	if m2.Category != "note" {
-		t.Errorf("default category: got %q want note", m2.Category)
+	if m2.MarkerTypeID != nil || m2.MarkerType != nil {
+		t.Errorf("expected no type, got %+v / %+v", m2.MarkerTypeID, m2.MarkerType)
 	}
 
-	// Create a success marker
+	// Create a Vゴール marker
 	var m3 markerResp
 	rec = env.do(t, http.MethodPost, "/runs/"+runID+"/markers",
-		map[string]any{"runOffsetSec": 70, "category": "success"}, &m3)
+		map[string]any{"runOffsetSec": 70, "markerTypeId": vgoal.ID}, &m3)
 	mustStatus(t, rec, http.StatusCreated)
 
 	// List all — should be ordered by run_offset_sec asc
@@ -89,21 +121,29 @@ func TestMarkerCRUDAndCategoryFilter(t *testing.T) {
 		t.Errorf("ordering: %+v", all.Data)
 	}
 
-	// Filter by category=failure,success
+	// Filter by markerTypeIds=retry,vgoal
 	var filtered markerListResp
-	rec = env.do(t, http.MethodGet, "/runs/"+runID+"/markers?category=failure,success", nil, &filtered)
+	rec = env.do(t, http.MethodGet, "/runs/"+runID+"/markers?markerTypeIds="+retry.ID+","+vgoal.ID, nil, &filtered)
 	mustStatus(t, rec, http.StatusOK)
 	if len(filtered.Data) != 2 {
 		t.Errorf("filter: %+v", filtered.Data)
 	}
 
-	// Update label + category
+	// Update label + type
 	var updated markerResp
 	rec = env.do(t, http.MethodPatch, "/markers/"+m1.ID,
-		map[string]any{"label": "完璧", "category": "success"}, &updated)
+		map[string]any{"label": "完璧", "markerTypeId": vgoal.ID}, &updated)
 	mustStatus(t, rec, http.StatusOK)
-	if updated.Label != "完璧" || updated.Category != "success" {
+	if updated.Label != "完璧" || updated.MarkerTypeID == nil || *updated.MarkerTypeID != vgoal.ID {
 		t.Errorf("update: %+v", updated)
+	}
+
+	// Clear the type with explicit null
+	rec = env.do(t, http.MethodPatch, "/markers/"+m1.ID,
+		map[string]any{"markerTypeId": nil}, &updated)
+	mustStatus(t, rec, http.StatusOK)
+	if updated.MarkerTypeID != nil {
+		t.Errorf("expected cleared type, got %v", updated.MarkerTypeID)
 	}
 
 	// Delete + 404 afterwards
@@ -111,6 +151,28 @@ func TestMarkerCRUDAndCategoryFilter(t *testing.T) {
 	mustStatus(t, rec, http.StatusNoContent)
 	rec = env.do(t, http.MethodPatch, "/markers/"+m2.ID, map[string]any{"label": "x"}, nil)
 	mustStatus(t, rec, http.StatusNotFound)
+}
+
+func TestMarkerTypeDeletionKeepsMarkers(t *testing.T) {
+	env := setupEnv(t)
+	runID, _, tournamentID := createBasicRun(t, env)
+	mt := createMarkerType(t, env, tournamentID, "Vゴール", "teal")
+
+	var m markerResp
+	rec := env.do(t, http.MethodPost, "/runs/"+runID+"/markers",
+		map[string]any{"runOffsetSec": 5, "markerTypeId": mt.ID}, &m)
+	mustStatus(t, rec, http.StatusCreated)
+
+	rec = env.do(t, http.MethodDelete, "/marker-types/"+mt.ID, nil, nil)
+	mustStatus(t, rec, http.StatusNoContent)
+
+	// Marker survives, now untyped (ON DELETE SET NULL).
+	var got markerResp
+	rec = env.do(t, http.MethodGet, "/markers/"+m.ID, nil, &got)
+	mustStatus(t, rec, http.StatusOK)
+	if got.MarkerTypeID != nil || got.MarkerType != nil {
+		t.Errorf("expected untyped marker after type delete, got %+v", got)
+	}
 }
 
 func TestMarkerCreateValidatesRun(t *testing.T) {
@@ -121,11 +183,24 @@ func TestMarkerCreateValidatesRun(t *testing.T) {
 	mustStatus(t, rec, http.StatusNotFound)
 }
 
-func TestMarkerCreateRejectsInvalidCategory(t *testing.T) {
+func TestMarkerCreateRejectsUnknownType(t *testing.T) {
 	env := setupEnv(t)
-	runID, _ := createBasicRun(t, env)
+	runID, _, _ := createBasicRun(t, env)
 	rec := env.do(t, http.MethodPost, "/runs/"+runID+"/markers",
-		map[string]any{"runOffsetSec": 1, "category": "lol"}, nil)
+		map[string]any{"runOffsetSec": 1, "markerTypeId": "00000000-0000-0000-0000-000000000000"}, nil)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Errorf("expected 422, got %d", rec.Code)
+	}
+}
+
+func TestMarkerCreateRejectsForeignTournamentType(t *testing.T) {
+	env := setupEnv(t)
+	runID, _, _ := createBasicRun(t, env)
+	// A marker type under a *different* tournament must be rejected.
+	otherTour := env.createTournament(t, "Other")
+	otherType := createMarkerType(t, env, otherTour, "別大会", "blue")
+	rec := env.do(t, http.MethodPost, "/runs/"+runID+"/markers",
+		map[string]any{"runOffsetSec": 1, "markerTypeId": otherType.ID}, nil)
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Errorf("expected 422, got %d", rec.Code)
 	}
@@ -133,9 +208,9 @@ func TestMarkerCreateRejectsInvalidCategory(t *testing.T) {
 
 func TestMarkerCreateRejectsNegativeOffset(t *testing.T) {
 	env := setupEnv(t)
-	runID, _ := createBasicRun(t, env)
+	runID, _, _ := createBasicRun(t, env)
 	rec := env.do(t, http.MethodPost, "/runs/"+runID+"/markers",
-		map[string]any{"runOffsetSec": -1, "category": "note"}, nil)
+		map[string]any{"runOffsetSec": -1}, nil)
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Errorf("expected 422, got %d", rec.Code)
 	}

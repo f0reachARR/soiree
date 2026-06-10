@@ -11,29 +11,41 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const countMarkersByTeamAndCategory = `-- name: CountMarkersByTeamAndCategory :many
-SELECT m.category, COUNT(*) AS count
+const countMarkersByTeamAndType = `-- name: CountMarkersByTeamAndType :many
+SELECT
+  m.marker_type_id,
+  mt.name  AS marker_type_name,
+  mt.color AS marker_type_color,
+  COUNT(*) AS count
 FROM markers m
 JOIN runs r ON r.id = m.run_id
+LEFT JOIN marker_types mt ON mt.id = m.marker_type_id
 WHERE r.team_id = $1
-GROUP BY m.category
+GROUP BY m.marker_type_id, mt.name, mt.color
 `
 
-type CountMarkersByTeamAndCategoryRow struct {
-	Category MarkerCategory
-	Count    int64
+type CountMarkersByTeamAndTypeRow struct {
+	MarkerTypeID    pgtype.UUID
+	MarkerTypeName  *string
+	MarkerTypeColor *string
+	Count           int64
 }
 
-func (q *Queries) CountMarkersByTeamAndCategory(ctx context.Context, teamID pgtype.UUID) ([]CountMarkersByTeamAndCategoryRow, error) {
-	rows, err := q.db.Query(ctx, countMarkersByTeamAndCategory, teamID)
+func (q *Queries) CountMarkersByTeamAndType(ctx context.Context, teamID pgtype.UUID) ([]CountMarkersByTeamAndTypeRow, error) {
+	rows, err := q.db.Query(ctx, countMarkersByTeamAndType, teamID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []CountMarkersByTeamAndCategoryRow
+	var items []CountMarkersByTeamAndTypeRow
 	for rows.Next() {
-		var i CountMarkersByTeamAndCategoryRow
-		if err := rows.Scan(&i.Category, &i.Count); err != nil {
+		var i CountMarkersByTeamAndTypeRow
+		if err := rows.Scan(
+			&i.MarkerTypeID,
+			&i.MarkerTypeName,
+			&i.MarkerTypeColor,
+			&i.Count,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -45,9 +57,9 @@ func (q *Queries) CountMarkersByTeamAndCategory(ctx context.Context, teamID pgty
 }
 
 const createMarker = `-- name: CreateMarker :one
-INSERT INTO markers (run_id, author_id, run_offset_sec, label, category)
+INSERT INTO markers (run_id, author_id, run_offset_sec, label, marker_type_id)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, run_id, author_id, run_offset_sec, label, category, created_at
+RETURNING id, run_id, author_id, run_offset_sec, label, created_at, marker_type_id
 `
 
 type CreateMarkerParams struct {
@@ -55,7 +67,7 @@ type CreateMarkerParams struct {
 	AuthorID     pgtype.UUID
 	RunOffsetSec int32
 	Label        string
-	Category     MarkerCategory
+	MarkerTypeID pgtype.UUID
 }
 
 func (q *Queries) CreateMarker(ctx context.Context, arg CreateMarkerParams) (Marker, error) {
@@ -64,7 +76,7 @@ func (q *Queries) CreateMarker(ctx context.Context, arg CreateMarkerParams) (Mar
 		arg.AuthorID,
 		arg.RunOffsetSec,
 		arg.Label,
-		arg.Category,
+		arg.MarkerTypeID,
 	)
 	var i Marker
 	err := row.Scan(
@@ -73,8 +85,8 @@ func (q *Queries) CreateMarker(ctx context.Context, arg CreateMarkerParams) (Mar
 		&i.AuthorID,
 		&i.RunOffsetSec,
 		&i.Label,
-		&i.Category,
 		&i.CreatedAt,
+		&i.MarkerTypeID,
 	)
 	return i, err
 }
@@ -92,33 +104,57 @@ func (q *Queries) DeleteMarker(ctx context.Context, id pgtype.UUID) (int64, erro
 }
 
 const getMarker = `-- name: GetMarker :one
-SELECT id, run_id, author_id, run_offset_sec, label, category, created_at FROM markers WHERE id = $1
+SELECT
+  m.id, m.run_id, m.author_id, m.run_offset_sec, m.label, m.created_at, m.marker_type_id,
+  mt.name  AS marker_type_name,
+  mt.color AS marker_type_color
+FROM markers m
+LEFT JOIN marker_types mt ON mt.id = m.marker_type_id
+WHERE m.id = $1
 `
 
-func (q *Queries) GetMarker(ctx context.Context, id pgtype.UUID) (Marker, error) {
+type GetMarkerRow struct {
+	ID              pgtype.UUID
+	RunID           pgtype.UUID
+	AuthorID        pgtype.UUID
+	RunOffsetSec    int32
+	Label           string
+	CreatedAt       pgtype.Timestamptz
+	MarkerTypeID    pgtype.UUID
+	MarkerTypeName  *string
+	MarkerTypeColor *string
+}
+
+func (q *Queries) GetMarker(ctx context.Context, id pgtype.UUID) (GetMarkerRow, error) {
 	row := q.db.QueryRow(ctx, getMarker, id)
-	var i Marker
+	var i GetMarkerRow
 	err := row.Scan(
 		&i.ID,
 		&i.RunID,
 		&i.AuthorID,
 		&i.RunOffsetSec,
 		&i.Label,
-		&i.Category,
 		&i.CreatedAt,
+		&i.MarkerTypeID,
+		&i.MarkerTypeName,
+		&i.MarkerTypeColor,
 	)
 	return i, err
 }
 
 const listMarkersByRun = `-- name: ListMarkersByRun :many
-SELECT id, run_id, author_id, run_offset_sec, label, category, created_at
-FROM markers
-WHERE run_id = $2
+SELECT
+  m.id, m.run_id, m.author_id, m.run_offset_sec, m.label, m.created_at, m.marker_type_id,
+  mt.name  AS marker_type_name,
+  mt.color AS marker_type_color
+FROM markers m
+LEFT JOIN marker_types mt ON mt.id = m.marker_type_id
+WHERE m.run_id = $2
   AND ($3::int IS NULL
-       OR (run_offset_sec, id) > ($3::int, $4::uuid))
-  AND (COALESCE(array_length($5::text[], 1), 0) = 0
-       OR category::text = ANY($5::text[]))
-ORDER BY run_offset_sec ASC, id ASC
+       OR (m.run_offset_sec, m.id) > ($3::int, $4::uuid))
+  AND (COALESCE(array_length($5::uuid[], 1), 0) = 0
+       OR m.marker_type_id = ANY($5::uuid[]))
+ORDER BY m.run_offset_sec ASC, m.id ASC
 LIMIT $1
 `
 
@@ -127,32 +163,46 @@ type ListMarkersByRunParams struct {
 	RunID           pgtype.UUID
 	CursorRunOffset *int32
 	CursorID        pgtype.UUID
-	Categories      []string
+	MarkerTypeIds   []pgtype.UUID
 }
 
-func (q *Queries) ListMarkersByRun(ctx context.Context, arg ListMarkersByRunParams) ([]Marker, error) {
+type ListMarkersByRunRow struct {
+	ID              pgtype.UUID
+	RunID           pgtype.UUID
+	AuthorID        pgtype.UUID
+	RunOffsetSec    int32
+	Label           string
+	CreatedAt       pgtype.Timestamptz
+	MarkerTypeID    pgtype.UUID
+	MarkerTypeName  *string
+	MarkerTypeColor *string
+}
+
+func (q *Queries) ListMarkersByRun(ctx context.Context, arg ListMarkersByRunParams) ([]ListMarkersByRunRow, error) {
 	rows, err := q.db.Query(ctx, listMarkersByRun,
 		arg.Limit,
 		arg.RunID,
 		arg.CursorRunOffset,
 		arg.CursorID,
-		arg.Categories,
+		arg.MarkerTypeIds,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Marker
+	var items []ListMarkersByRunRow
 	for rows.Next() {
-		var i Marker
+		var i ListMarkersByRunRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.RunID,
 			&i.AuthorID,
 			&i.RunOffsetSec,
 			&i.Label,
-			&i.Category,
 			&i.CreatedAt,
+			&i.MarkerTypeID,
+			&i.MarkerTypeName,
+			&i.MarkerTypeColor,
 		); err != nil {
 			return nil, err
 		}
@@ -169,23 +219,27 @@ UPDATE markers
 SET
   run_offset_sec = COALESCE($1, run_offset_sec),
   label          = COALESCE($2, label),
-  category       = COALESCE($3, category)
-WHERE id = $4
-RETURNING id, run_id, author_id, run_offset_sec, label, category, created_at
+  marker_type_id = CASE WHEN $3::bool
+                        THEN $4::uuid
+                        ELSE marker_type_id END
+WHERE id = $5
+RETURNING id, run_id, author_id, run_offset_sec, label, created_at, marker_type_id
 `
 
 type UpdateMarkerParams struct {
-	RunOffsetSec *int32
-	Label        *string
-	Category     NullMarkerCategory
-	ID           pgtype.UUID
+	RunOffsetSec  *int32
+	Label         *string
+	SetMarkerType bool
+	MarkerTypeID  pgtype.UUID
+	ID            pgtype.UUID
 }
 
 func (q *Queries) UpdateMarker(ctx context.Context, arg UpdateMarkerParams) (Marker, error) {
 	row := q.db.QueryRow(ctx, updateMarker,
 		arg.RunOffsetSec,
 		arg.Label,
-		arg.Category,
+		arg.SetMarkerType,
+		arg.MarkerTypeID,
 		arg.ID,
 	)
 	var i Marker
@@ -195,8 +249,8 @@ func (q *Queries) UpdateMarker(ctx context.Context, arg UpdateMarkerParams) (Mar
 		&i.AuthorID,
 		&i.RunOffsetSec,
 		&i.Label,
-		&i.Category,
 		&i.CreatedAt,
+		&i.MarkerTypeID,
 	)
 	return i, err
 }

@@ -64,18 +64,18 @@ func (h *Runs) Search(w http.ResponseWriter, r *http.Request) {
 	if v := r.URL.Query().Get("q"); v != "" {
 		params.MemoQ = &v
 	}
-	if v := r.URL.Query().Get("markerCategories"); v != "" {
+	if v := r.URL.Query().Get("markerTypeIds"); v != "" {
 		for _, c := range strings.Split(v, ",") {
 			c = strings.TrimSpace(c)
 			if c == "" {
 				continue
 			}
-			mc, err := parseMarkerCategory(c)
+			id, err := parseUUIDParam(c)
 			if err != nil {
-				badRequest(w, err.Error())
+				badRequest(w, "invalid markerTypeId")
 				return
 			}
-			params.MarkerCategories = append(params.MarkerCategories, string(mc))
+			params.MarkerTypeIds = append(params.MarkerTypeIds, id)
 		}
 	}
 	if v := r.URL.Query().Get("tagIds"); v != "" {

@@ -5,18 +5,42 @@ import (
 	"testing"
 )
 
+type teamMarkerTypeCountResp struct {
+	MarkerTypeID *string `json:"markerTypeId"`
+	Name         *string `json:"name"`
+	Color        *string `json:"color"`
+	Count        int64   `json:"count"`
+}
+
 type teamMarkerStatsResp struct {
-	TeamID  string `json:"teamId"`
-	Success int64  `json:"success"`
-	Failure int64  `json:"failure"`
-	Note    int64  `json:"note"`
+	TeamID string                    `json:"teamId"`
+	Data   []teamMarkerTypeCountResp `json:"data"`
+}
+
+// countFor returns the aggregated count for a given marker type id (or the
+// untyped bucket when id is empty).
+func (s teamMarkerStatsResp) countFor(id string) int64 {
+	for _, d := range s.Data {
+		if id == "" {
+			if d.MarkerTypeID == nil {
+				return d.Count
+			}
+			continue
+		}
+		if d.MarkerTypeID != nil && *d.MarkerTypeID == id {
+			return d.Count
+		}
+	}
+	return 0
 }
 
 func TestTeamMarkerStatsAggregates(t *testing.T) {
 	env := setupEnv(t)
 	deps := seedRunDeps(t, env)
 
-	// Create a second run on the same team to verify aggregation across runs.
+	vgoal := createMarkerType(t, env, deps.TournamentID, "Vゴール", "teal")
+	retry := createMarkerType(t, env, deps.TournamentID, "リトライ", "red")
+
 	var r2 runResp
 	rec := env.do(t, http.MethodPost, "/runs", map[string]any{
 		"sessionId":   deps.SessionID,
@@ -28,8 +52,6 @@ func TestTeamMarkerStatsAggregates(t *testing.T) {
 	}, &r2)
 	mustStatus(t, rec, http.StatusCreated)
 
-	// Build a run via the same deps' team to capture the existing run too.
-	// Use the run from seedRunDeps by creating one explicitly:
 	var r1 runResp
 	rec = env.do(t, http.MethodPost, "/runs", map[string]any{
 		"sessionId":   deps.SessionID,
@@ -41,22 +63,31 @@ func TestTeamMarkerStatsAggregates(t *testing.T) {
 	}, &r1)
 	mustStatus(t, rec, http.StatusCreated)
 
-	// Drop markers: r1 has 2 success + 1 note, r2 has 1 failure.
-	addMarker := func(runID, cat string) {
-		rec := env.do(t, http.MethodPost, "/runs/"+runID+"/markers",
-			map[string]any{"runOffsetSec": 1, "category": cat}, nil)
+	// r1: 2 Vゴール + 1 untyped, r2: 1 リトライ.
+	addMarker := func(runID string, typeID *string) {
+		body := map[string]any{"runOffsetSec": 1}
+		if typeID != nil {
+			body["markerTypeId"] = *typeID
+		}
+		rec := env.do(t, http.MethodPost, "/runs/"+runID+"/markers", body, nil)
 		mustStatus(t, rec, http.StatusCreated)
 	}
-	addMarker(r1.ID, "success")
-	addMarker(r1.ID, "success")
-	addMarker(r1.ID, "note")
-	addMarker(r2.ID, "failure")
+	addMarker(r1.ID, &vgoal.ID)
+	addMarker(r1.ID, &vgoal.ID)
+	addMarker(r1.ID, nil)
+	addMarker(r2.ID, &retry.ID)
 
 	var stats teamMarkerStatsResp
 	rec = env.do(t, http.MethodGet, "/teams/"+deps.TeamID+"/marker-stats", nil, &stats)
 	mustStatus(t, rec, http.StatusOK)
-	if stats.Success != 2 || stats.Failure != 1 || stats.Note != 1 {
-		t.Errorf("stats: %+v", stats)
+	if got := stats.countFor(vgoal.ID); got != 2 {
+		t.Errorf("Vゴール count: got %d want 2 (%+v)", got, stats.Data)
+	}
+	if got := stats.countFor(retry.ID); got != 1 {
+		t.Errorf("リトライ count: got %d want 1 (%+v)", got, stats.Data)
+	}
+	if got := stats.countFor(""); got != 1 {
+		t.Errorf("untyped count: got %d want 1 (%+v)", got, stats.Data)
 	}
 	if stats.TeamID != deps.TeamID {
 		t.Errorf("teamId echo: %q vs %q", stats.TeamID, deps.TeamID)
@@ -76,8 +107,8 @@ func TestTeamMarkerStatsEmpty(t *testing.T) {
 	var stats teamMarkerStatsResp
 	rec = env.do(t, http.MethodGet, "/teams/"+team.ID+"/marker-stats", nil, &stats)
 	mustStatus(t, rec, http.StatusOK)
-	if stats.Success+stats.Failure+stats.Note != 0 {
-		t.Errorf("expected zeros, got %+v", stats)
+	if len(stats.Data) != 0 {
+		t.Errorf("expected empty data, got %+v", stats.Data)
 	}
 }
 

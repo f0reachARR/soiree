@@ -20,11 +20,12 @@ type Querier interface {
 	ClearRobotPrimaryImageIfMatches(ctx context.Context, arg ClearRobotPrimaryImageIfMatchesParams) error
 	ClearRunTags(ctx context.Context, runID pgtype.UUID) error
 	ClearTournamentTeams(ctx context.Context, tournamentID pgtype.UUID) error
-	CountMarkersByTeamAndCategory(ctx context.Context, teamID pgtype.UUID) ([]CountMarkersByTeamAndCategoryRow, error)
+	CountMarkersByTeamAndType(ctx context.Context, teamID pgtype.UUID) ([]CountMarkersByTeamAndTypeRow, error)
 	CountRenditionsByStatus(ctx context.Context, videoID pgtype.UUID) (CountRenditionsByStatusRow, error)
 	CreateAnnotation(ctx context.Context, arg CreateAnnotationParams) (Annotation, error)
 	CreateDevice(ctx context.Context, arg CreateDeviceParams) (Device, error)
 	CreateMarker(ctx context.Context, arg CreateMarkerParams) (Marker, error)
+	CreateMarkerType(ctx context.Context, arg CreateMarkerTypeParams) (MarkerType, error)
 	CreateMatch(ctx context.Context, arg CreateMatchParams) (Match, error)
 	CreateRobot(ctx context.Context, arg CreateRobotParams) (Robot, error)
 	CreateRun(ctx context.Context, arg CreateRunParams) (Run, error)
@@ -43,6 +44,7 @@ type Querier interface {
 	DeleteAnnotation(ctx context.Context, id pgtype.UUID) (int64, error)
 	DeleteDevice(ctx context.Context, id pgtype.UUID) (int64, error)
 	DeleteMarker(ctx context.Context, id pgtype.UUID) (int64, error)
+	DeleteMarkerType(ctx context.Context, id pgtype.UUID) (int64, error)
 	DeleteMatch(ctx context.Context, id pgtype.UUID) (int64, error)
 	DeleteRobot(ctx context.Context, id pgtype.UUID) (int64, error)
 	DeleteRobotImage(ctx context.Context, id pgtype.UUID) (int64, error)
@@ -62,7 +64,8 @@ type Querier interface {
 	DeleteVideo(ctx context.Context, id pgtype.UUID) (int64, error)
 	GetAnnotation(ctx context.Context, id pgtype.UUID) (Annotation, error)
 	GetDevice(ctx context.Context, id pgtype.UUID) (Device, error)
-	GetMarker(ctx context.Context, id pgtype.UUID) (Marker, error)
+	GetMarker(ctx context.Context, id pgtype.UUID) (GetMarkerRow, error)
+	GetMarkerType(ctx context.Context, id pgtype.UUID) (MarkerType, error)
 	GetMatch(ctx context.Context, id pgtype.UUID) (Match, error)
 	GetOwnTeam(ctx context.Context) (Team, error)
 	GetRendition(ctx context.Context, id pgtype.UUID) (VideoRendition, error)
@@ -96,7 +99,8 @@ type Querier interface {
 	// recently. Returned newest first so the dashboard shows current activity at
 	// the top.
 	ListEncodingVideos(ctx context.Context, limit int32) ([]Video, error)
-	ListMarkersByRun(ctx context.Context, arg ListMarkersByRunParams) ([]Marker, error)
+	ListMarkerTypesByTournament(ctx context.Context, tournamentID pgtype.UUID) ([]MarkerType, error)
+	ListMarkersByRun(ctx context.Context, arg ListMarkersByRunParams) ([]ListMarkersByRunRow, error)
 	ListMatchesPage(ctx context.Context, arg ListMatchesPageParams) ([]Match, error)
 	// Videos uploaded against the Run's session that are not yet attached to it.
 	// Used to populate the "Run に追加すべき動画" recommendation list.
@@ -148,6 +152,7 @@ type Querier interface {
 	UpdateAnnotation(ctx context.Context, arg UpdateAnnotationParams) (Annotation, error)
 	UpdateDevice(ctx context.Context, arg UpdateDeviceParams) (Device, error)
 	UpdateMarker(ctx context.Context, arg UpdateMarkerParams) (Marker, error)
+	UpdateMarkerType(ctx context.Context, arg UpdateMarkerTypeParams) (MarkerType, error)
 	UpdateMatch(ctx context.Context, arg UpdateMatchParams) (Match, error)
 	UpdateRobot(ctx context.Context, arg UpdateRobotParams) (Robot, error)
 	UpdateRobotImage(ctx context.Context, arg UpdateRobotImageParams) (RobotImage, error)

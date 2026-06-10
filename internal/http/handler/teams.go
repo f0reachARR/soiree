@@ -141,11 +141,16 @@ func (h *Teams) Update(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toTeamDTO(t))
 }
 
+type teamMarkerTypeCountDTO struct {
+	MarkerTypeID *string `json:"markerTypeId"`
+	Name         *string `json:"name"`
+	Color        *string `json:"color"`
+	Count        int64   `json:"count"`
+}
+
 type teamMarkerStatsDTO struct {
-	TeamID  string `json:"teamId"`
-	Success int64  `json:"success"`
-	Failure int64  `json:"failure"`
-	Note    int64  `json:"note"`
+	TeamID string                   `json:"teamId"`
+	Data   []teamMarkerTypeCountDTO `json:"data"`
 }
 
 func (h *Teams) MarkerStats(w http.ResponseWriter, r *http.Request) {
@@ -162,21 +167,24 @@ func (h *Teams) MarkerStats(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
-	rows, err := h.Q.CountMarkersByTeamAndCategory(r.Context(), id)
+	rows, err := h.Q.CountMarkersByTeamAndType(r.Context(), id)
 	if err != nil {
 		internalError(w, err)
 		return
 	}
-	out := teamMarkerStatsDTO{TeamID: uuidString(id)}
+	out := teamMarkerStatsDTO{TeamID: uuidString(id), Data: make([]teamMarkerTypeCountDTO, 0, len(rows))}
 	for _, row := range rows {
-		switch row.Category {
-		case sqlc.MarkerCategorySuccess:
-			out.Success = row.Count
-		case sqlc.MarkerCategoryFailure:
-			out.Failure = row.Count
-		case sqlc.MarkerCategoryNote:
-			out.Note = row.Count
+		var typeID *string
+		if row.MarkerTypeID.Valid {
+			s := uuidString(row.MarkerTypeID)
+			typeID = &s
 		}
+		out.Data = append(out.Data, teamMarkerTypeCountDTO{
+			MarkerTypeID: typeID,
+			Name:         row.MarkerTypeName,
+			Color:        row.MarkerTypeColor,
+			Count:        row.Count,
+		})
 	}
 	writeJSON(w, http.StatusOK, out)
 }

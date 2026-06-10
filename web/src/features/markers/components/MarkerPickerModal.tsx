@@ -12,15 +12,9 @@ import {
 } from "@mantine/core";
 import { useMemo, useState } from "react";
 
-import type { MarkerCategory } from "../../../lib/api/client";
 import { useMarkers } from "../api/queries";
+import { markerDisplayColor, markerDisplayName } from "../lib/category";
 import { useRuns } from "../../runs/api/queries";
-
-const categoryLabel: Record<MarkerCategory, string> = {
-  success: "成功",
-  failure: "失敗",
-  note: "メモ",
-};
 
 export function MarkerPickerModal({
   opened,
@@ -77,7 +71,7 @@ export function MarkerPickerModal({
             <Table.Thead>
               <Table.Tr>
                 <Table.Th style={{ width: 70 }}>Time</Table.Th>
-                <Table.Th style={{ width: 80 }}>Category</Table.Th>
+                <Table.Th style={{ width: 80 }}>種別</Table.Th>
                 <Table.Th>Label</Table.Th>
                 <Table.Th style={{ width: 60 }}></Table.Th>
               </Table.Tr>
@@ -91,8 +85,8 @@ export function MarkerPickerModal({
                     </Text>
                   </Table.Td>
                   <Table.Td>
-                    <Badge size="xs" variant="light">
-                      {categoryLabel[m.category]}
+                    <Badge size="xs" variant="light" color={markerDisplayColor(m)}>
+                      {markerDisplayName(m)}
                     </Badge>
                   </Table.Td>
                   <Table.Td>

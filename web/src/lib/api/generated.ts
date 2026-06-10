@@ -275,7 +275,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * チーム配下 Run の Marker カテゴリ別件数
+         * チーム配下 Run の Marker 種別別件数
          * @description 対戦相手スカウト用。Phase 2 のマッチアップビューで使う。
          */
         get: operations["getTeamMarkerStats"];
@@ -1007,6 +1007,46 @@ export interface paths {
         patch: operations["updateMarker"];
         trace?: never;
     };
+    "/tournaments/{tournamentId}/marker-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tournamentId: components["parameters"]["TournamentId"];
+            };
+            cookie?: never;
+        };
+        /** 大会の Marker 種別一覧 */
+        get: operations["listMarkerTypes"];
+        put?: never;
+        /** Marker 種別作成 */
+        post: operations["createMarkerType"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/marker-types/{markerTypeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                markerTypeId: components["parameters"]["MarkerTypeId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Marker 種別削除（紐づく Marker は種別なしになる） */
+        delete: operations["deleteMarkerType"];
+        options?: never;
+        head?: never;
+        /** Marker 種別更新 */
+        patch: operations["updateMarkerType"];
+        trace?: never;
+    };
     "/search/runs": {
         parameters: {
             query?: never;
@@ -1017,7 +1057,7 @@ export interface paths {
         /**
          * Run の横断検索
          * @description spec-devflow.md §9 で扱う Phase 1 の検索条件。
-         *     期間 / Robot / Scenario / tags / Marker category / memo の組合せで Run を絞り込む。
+         *     期間 / Robot / Scenario / tags / Marker 種別 / memo の組合せで Run を絞り込む。
          */
         get: operations["searchRuns"];
         put?: never;
@@ -1223,11 +1263,40 @@ export interface components {
          * @enum {string}
          */
         SessionModeHint: "practice" | "pre_match";
-        /**
-         * @description Marker のカテゴリ。spec の `success | failure | note` を採用
-         * @enum {string}
-         */
-        MarkerCategory: "success" | "failure" | "note";
+        MarkerType: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            tournamentId: string;
+            name: string;
+            /** @description Mantine カラーキー（例 teal / red / blue） */
+            color: string;
+            sortOrder: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @description Marker に展開された種別の参照（一覧/取得時の表示用） */
+        MarkerTypeRef: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            color: string;
+        };
+        MarkerTypeList: {
+            data: components["schemas"]["MarkerType"][];
+        };
+        CreateMarkerTypeRequest: {
+            name: string;
+            /** @default blue */
+            color: string;
+            /** @default 0 */
+            sortOrder: number;
+        };
+        UpdateMarkerTypeRequest: {
+            name?: string;
+            color?: string;
+            sortOrder?: number;
+        };
         AuthConfig: {
             oidcEnabled: boolean;
             devBypassEnabled: boolean;
@@ -1724,7 +1793,13 @@ export interface components {
             /** @description Run 開始からの秒数（spec §3.4） */
             runOffsetSec: number;
             label: string;
-            category: components["schemas"]["MarkerCategory"];
+            /**
+             * Format: uuid
+             * @description 紐づく Marker 種別 ID（種別なしの場合 null）
+             */
+            markerTypeId: string | null;
+            /** @description 展開された種別（種別なしの場合 null） */
+            markerType?: components["schemas"]["MarkerTypeRef"] | null;
             /** Format: date-time */
             createdAt: string;
         };
@@ -1732,23 +1807,39 @@ export interface components {
             runOffsetSec: number;
             /** @default  */
             label: string;
-            category: components["schemas"]["MarkerCategory"];
+            /**
+             * Format: uuid
+             * @description 種別なしの場合は省略または null
+             */
+            markerTypeId?: string | null;
         };
         UpdateMarkerRequest: {
             runOffsetSec?: number;
             label?: string;
-            category?: components["schemas"]["MarkerCategory"];
+            /**
+             * Format: uuid
+             * @description 指定すると種別を変更（null で種別なしにクリア）。省略時は変更なし
+             */
+            markerTypeId?: string | null;
         };
         MarkerList: {
             data: components["schemas"]["Marker"][];
             pagination: components["schemas"]["Pagination"];
         };
+        TeamMarkerTypeCount: {
+            /**
+             * Format: uuid
+             * @description 種別なしマーカーの集計は null
+             */
+            markerTypeId: string | null;
+            name: string | null;
+            color: string | null;
+            count: number;
+        };
         TeamMarkerStats: {
             /** Format: uuid */
             teamId: string;
-            success: number;
-            failure: number;
-            note: number;
+            data: components["schemas"]["TeamMarkerTypeCount"][];
         };
         Tournament: {
             /** Format: uuid */
@@ -1995,6 +2086,7 @@ export interface components {
         RunId: string;
         RunVideoId: string;
         MarkerId: string;
+        MarkerTypeId: string;
         TournamentId: string;
         MatchIdPath: string;
         AnnotationId: string;
@@ -3977,8 +4069,8 @@ export interface operations {
     listMarkers: {
         parameters: {
             query?: {
-                /** @description 複数指定可（カンマ区切り） */
-                category?: components["schemas"]["MarkerCategory"][];
+                /** @description Marker 種別 ID で絞り込み（カンマ区切り、OR 条件） */
+                markerTypeIds?: string[];
                 /** @description 前回レスポンスの `pagination.nextCursor` */
                 cursor?: components["parameters"]["Cursor"];
                 /** @description 1 レスポンスあたり最大件数（1〜200、既定 50） */
@@ -4103,6 +4195,107 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    listMarkerTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tournamentId: components["parameters"]["TournamentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkerTypeList"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createMarkerType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tournamentId: components["parameters"]["TournamentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMarkerTypeRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkerType"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
+        };
+    };
+    deleteMarkerType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                markerTypeId: components["parameters"]["MarkerTypeId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateMarkerType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                markerTypeId: components["parameters"]["MarkerTypeId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMarkerTypeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkerType"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
+        };
+    };
     searchRuns: {
         parameters: {
             query: {
@@ -4113,8 +4306,8 @@ export interface operations {
                 scenarioId?: string;
                 /** @description タグ ID（カンマ区切り、AND 条件） */
                 tagIds?: string[];
-                /** @description 含まれている Marker のカテゴリ（カンマ区切り、OR 条件） */
-                markerCategories?: components["schemas"]["MarkerCategory"][];
+                /** @description 含まれている Marker の種別 ID（カンマ区切り、OR 条件） */
+                markerTypeIds?: string[];
                 /** @description memo の全文検索（pg_trgm） */
                 q?: string;
                 /** @description 前回レスポンスの `pagination.nextCursor` */
