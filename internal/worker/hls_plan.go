@@ -52,6 +52,7 @@ type renditionSpec struct {
 var renditionsAscending = []renditionSpec{
 	{kind: sqlc.RenditionKind480p, height: 480, videoBitrate: "1200k", audioBitrate: "128k", bandwidthBps: 1_400_000},
 	{kind: sqlc.RenditionKind720p, height: 720, videoBitrate: "2500k", audioBitrate: "128k", bandwidthBps: 2_800_000},
+	{kind: sqlc.RenditionKind1080p, height: 1080, videoBitrate: "4500k", audioBitrate: "128k", bandwidthBps: 5_000_000},
 }
 
 func (w *PlanHLSWorker) Work(ctx context.Context, job *river.Job[PlanHLSArgs]) error {

@@ -201,6 +201,8 @@ func (w *EncodeVariantWorker) Work(ctx context.Context, job *river.Job[EncodeVar
 
 func videoBitrateFor(kind sqlc.RenditionKind) string {
 	switch kind {
+	case sqlc.RenditionKind1080p:
+		return "4500k"
 	case sqlc.RenditionKind720p:
 		return "2500k"
 	case sqlc.RenditionKind480p:

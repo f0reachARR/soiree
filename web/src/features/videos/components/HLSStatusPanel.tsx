@@ -19,6 +19,7 @@ const HLS_STATUS_LABEL: Record<string, string> = {
 
 const KIND_LABEL: Record<string, string> = {
   original: "Original",
+  "1080p": "1080p",
   "720p": "720p",
   "480p": "480p",
 };
@@ -46,8 +47,8 @@ function estimateProgress(r: VideoRendition, durationSec: number | null) {
 export function HLSStatusPanel({ data }: { data: VideoRenditionList }) {
   const rends = [...data.data].sort((a, b) => {
     // Show "original" first so users see the fastest variant at the top, then
-    // 720p, 480p.
-    const order = ["original", "720p", "480p"];
+    // 1080p, 720p, 480p.
+    const order = ["original", "1080p", "720p", "480p"];
     return order.indexOf(a.kind) - order.indexOf(b.kind);
   });
   return (
