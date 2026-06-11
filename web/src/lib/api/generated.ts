@@ -1600,7 +1600,7 @@ export interface components {
             /** Format: uuid */
             videoId: string;
             /** @enum {string} */
-            kind: "original" | "720p" | "480p";
+            kind: "original" | "1080p" | "720p" | "480p";
             /** @enum {string} */
             status: "pending" | "encoding" | "ready" | "failed";
             /**

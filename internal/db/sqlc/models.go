@@ -105,6 +105,7 @@ type RenditionKind string
 
 const (
 	RenditionKindOriginal RenditionKind = "original"
+	RenditionKind1080p    RenditionKind = "1080p"
 	RenditionKind720p     RenditionKind = "720p"
 	RenditionKind480p     RenditionKind = "480p"
 )

@@ -2962,7 +2962,7 @@ components:
           format: uuid
         kind:
           type: string
-          enum: [original, "720p", "480p"]
+          enum: [original, "1080p", "720p", "480p"]
         status:
           type: string
           enum: [pending, encoding, ready, failed]
