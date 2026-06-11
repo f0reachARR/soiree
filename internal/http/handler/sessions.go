@@ -286,7 +286,11 @@ func (h *Sessions) Candidates(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
-	if !video.RecordedAt.Valid {
+	// Match against the effective recording time (raw recorded_at corrected by
+	// the device default + per-video time offset), so videos whose camera clock
+	// is skewed still land in the right session window.
+	effective := effectiveRecordedAt(video, videoDeviceOffset(r.Context(), h.Q, video))
+	if effective == nil {
 		// Without recorded_at we can only propose a new session.
 		writeJSON(w, http.StatusOK, sessionCandidateListResponse{
 			Data: []sessionCandidateDTO{newSessionCandidate(time.Time{}, video)},
@@ -294,7 +298,7 @@ func (h *Sessions) Candidates(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	recordedAt := video.RecordedAt.Time
+	recordedAt := *effective
 	var durationSec int32
 	if video.DurationSec != nil {
 		durationSec = *video.DurationSec

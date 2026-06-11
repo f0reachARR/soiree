@@ -4,13 +4,11 @@ package worker
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 
@@ -55,27 +53,15 @@ func (w *ProbeVideoWorker) Work(ctx context.Context, job *river.Job[ProbeVideoAr
 		return fmt.Errorf("get video: %w", err)
 	}
 
-	var deviceOffsetSec int32
-	if v.DeviceID.Valid {
-		dev, err := w.Q.GetDevice(ctx, v.DeviceID)
-		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			slog.Warn("device lookup failed; using zero offset", "error", err)
-		}
-		if dev.ID.Valid {
-			deviceOffsetSec = dev.DefaultTimeOffsetSec
-		}
-	}
-
 	sourceURL, _, err := w.Storage.PresignGetWithTTL(ctx, v.StorageKey, presignProbeTTL)
 	if err != nil {
 		return fmt.Errorf("presign source: %w", err)
 	}
 
 	claim := hlswire.ProbeClaim{
-		VideoID:             v.ID.String(),
-		SourceURL:           sourceURL,
-		ThumbnailKey:        "thumbnails/" + v.StorageKey + ".jpg",
-		DeviceTimeOffsetSec: deviceOffsetSec,
+		VideoID:      v.ID.String(),
+		SourceURL:    sourceURL,
+		ThumbnailKey: "thumbnails/" + v.StorageKey + ".jpg",
 	}
 	payload, err := json.Marshal(claim)
 	if err != nil {

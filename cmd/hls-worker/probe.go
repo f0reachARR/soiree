@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"github.com/f0reachARR/soiree/internal/hlsrunner/ffmpeg"
 	"github.com/f0reachARR/soiree/internal/hlswire"
@@ -30,11 +29,8 @@ func runProbe(ctx context.Context, _ *apiClient, store *storage.Client, job *hls
 		return nil, fmt.Errorf("ffprobe: %w", err)
 	}
 
-	// Apply the device's default time offset before reporting back.
-	if meta.RecordedAt != nil && claim.DeviceTimeOffsetSec != 0 {
-		adjusted := meta.RecordedAt.Add(-time.Duration(claim.DeviceTimeOffsetSec) * time.Second)
-		meta.RecordedAt = &adjusted
-	}
+	// recordedAt is stored raw — time offsets (device default + per-video) are
+	// applied at read time, not baked in here.
 
 	out := hlswire.ProbeComplete{
 		LeaseAuth:     hlswire.LeaseAuth{LeaseToken: job.LeaseToken},
