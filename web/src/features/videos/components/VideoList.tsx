@@ -97,9 +97,9 @@ export function VideoList({
                 : "—"}
             </Table.Td>
             <Table.Td>
-              {v.recordedAt ? (
-                <Text size="xs" title={formatDateTimeFull(v.recordedAt)}>
-                  {formatDateTimeShort(v.recordedAt)}
+              {v.effectiveRecordedAt ? (
+                <Text size="xs" title={formatDateTimeFull(v.effectiveRecordedAt)}>
+                  {formatDateTimeShort(v.effectiveRecordedAt)}
                 </Text>
               ) : (
                 "—"
@@ -161,9 +161,12 @@ export function VideoList({
                     : "—"}
                 </Text>
                 <Group gap="xs">
-                  {v.recordedAt && (
-                    <Text size="xs" title={formatDateTimeFull(v.recordedAt)}>
-                      {formatDateTimeShort(v.recordedAt)}
+                  {v.effectiveRecordedAt && (
+                    <Text
+                      size="xs"
+                      title={formatDateTimeFull(v.effectiveRecordedAt)}
+                    >
+                      {formatDateTimeShort(v.effectiveRecordedAt)}
                     </Text>
                   )}
                   {v.durationSec != null && (

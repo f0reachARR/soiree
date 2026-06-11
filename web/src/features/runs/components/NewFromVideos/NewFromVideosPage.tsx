@@ -53,31 +53,35 @@ export function NewFromVideosPage({
   }, [sessions.data, sessionId]);
 
   // --- Timeline domain ---------------------------------------------------
+  // The wall-clock timeline is built from effectiveRecordedAt (raw recorded_at
+  // corrected by the device + per-video time offset), so skewed camera clocks
+  // align on a shared timeline.
   const placeable = useMemo(
-    () => videos.filter((v) => v.recordedAt),
+    () => videos.filter((v) => v.effectiveRecordedAt),
     [videos],
   );
   const unplaceable = useMemo(
-    () => videos.filter((v) => !v.recordedAt),
+    () => videos.filter((v) => !v.effectiveRecordedAt),
     [videos],
   );
   const t0Ms = useMemo(() => {
     const stamps = placeable.map((v) =>
-      new Date(v.recordedAt as string).getTime(),
+      new Date(v.effectiveRecordedAt as string).getTime(),
     );
     return stamps.length === 0 ? Date.now() : Math.min(...stamps);
   }, [placeable]);
   const totalSec = useMemo(() => {
     let max = 1;
     for (const v of placeable) {
-      const s = (new Date(v.recordedAt as string).getTime() - t0Ms) / 1000;
+      const s =
+        (new Date(v.effectiveRecordedAt as string).getTime() - t0Ms) / 1000;
       max = Math.max(max, s + (v.durationSec ?? 0));
     }
     return Math.max(max, 1);
   }, [placeable, t0Ms]);
   const bandOf = (v: Video) => {
     const startSec =
-      (new Date(v.recordedAt as string).getTime() - t0Ms) / 1000;
+      (new Date(v.effectiveRecordedAt as string).getTime() - t0Ms) / 1000;
     return { startSec, endSec: startSec + (v.durationSec ?? 0) };
   };
 

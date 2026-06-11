@@ -2,12 +2,13 @@ import type { Video } from "../../../lib/api/client";
 
 type Range = { start: number; end: number };
 
-// A video's time range is [recordedAt, recordedAt + durationSec]. Videos
-// without a recordedAt have no known position on the timeline, so they can't
-// participate in overlap matching.
+// A video's time range is [effectiveRecordedAt, effectiveRecordedAt +
+// durationSec], using the offset-corrected time so clock-skewed cameras still
+// line up. Videos without an effectiveRecordedAt have no known position on the
+// timeline, so they can't participate in overlap matching.
 function rangeOf(v: Video): Range | null {
-  if (!v.recordedAt) return null;
-  const start = new Date(v.recordedAt).getTime();
+  if (!v.effectiveRecordedAt) return null;
+  const start = new Date(v.effectiveRecordedAt).getTime();
   if (Number.isNaN(start)) return null;
   const end = start + (v.durationSec ?? 0) * 1000;
   return { start, end };
