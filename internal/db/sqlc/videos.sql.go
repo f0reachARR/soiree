@@ -26,7 +26,7 @@ type CreateVideoParams struct {
 	DisplayName   string
 	RecordedAt    pgtype.Timestamptz
 	DurationSec   *int32
-	TimeOffsetSec int32
+	TimeOffsetSec float64
 }
 
 func (q *Queries) CreateVideo(ctx context.Context, arg CreateVideoParams) (Video, error) {
@@ -232,7 +232,7 @@ type UpdateVideoParams struct {
 	DeviceID      pgtype.UUID
 	RecordedAtSet bool
 	RecordedAt    pgtype.Timestamptz
-	TimeOffsetSec *int32
+	TimeOffsetSec *float64
 	DisplayName   *string
 	ID            pgtype.UUID
 }

@@ -19,7 +19,7 @@ RETURNING id, name, default_time_offset_sec, created_at
 
 type CreateDeviceParams struct {
 	Name                 string
-	DefaultTimeOffsetSec int32
+	DefaultTimeOffsetSec float64
 }
 
 func (q *Queries) CreateDevice(ctx context.Context, arg CreateDeviceParams) (Device, error) {
@@ -141,7 +141,7 @@ RETURNING id, name, default_time_offset_sec, created_at
 
 type UpdateDeviceParams struct {
 	Name                 *string
-	DefaultTimeOffsetSec *int32
+	DefaultTimeOffsetSec *float64
 	ID                   pgtype.UUID
 }
 

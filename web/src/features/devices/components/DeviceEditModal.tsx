@@ -38,9 +38,10 @@ export function DeviceEditModal({
         />
         <NumberInput
           label="Default Time Offset (秒)"
-          description="プラスなら機材時刻が進んでいる。0 で OK"
+          description="プラスなら機材時刻が進んでいる。小数可。0 で OK"
           value={offset}
           onChange={(v) => setOffset(typeof v === "number" ? v : 0)}
+          step={0.1}
         />
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose}>

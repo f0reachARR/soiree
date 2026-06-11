@@ -16,7 +16,7 @@ type Devices struct {
 type deviceDTO struct {
 	ID                   string    `json:"id"`
 	Name                 string    `json:"name"`
-	DefaultTimeOffsetSec int32     `json:"defaultTimeOffsetSec"`
+	DefaultTimeOffsetSec float64   `json:"defaultTimeOffsetSec"`
 	CreatedAt            time.Time `json:"createdAt"`
 }
 
@@ -30,13 +30,13 @@ func toDeviceDTO(d sqlc.Device) deviceDTO {
 }
 
 type createDeviceRequest struct {
-	Name                 string `json:"name"`
-	DefaultTimeOffsetSec *int32 `json:"defaultTimeOffsetSec"`
+	Name                 string   `json:"name"`
+	DefaultTimeOffsetSec *float64 `json:"defaultTimeOffsetSec"`
 }
 
 type updateDeviceRequest struct {
-	Name                 *string `json:"name"`
-	DefaultTimeOffsetSec *int32  `json:"defaultTimeOffsetSec"`
+	Name                 *string  `json:"name"`
+	DefaultTimeOffsetSec *float64 `json:"defaultTimeOffsetSec"`
 }
 
 type deviceListResponse struct {
@@ -84,7 +84,7 @@ func (h *Devices) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "validation", "name is required", nil)
 		return
 	}
-	offset := int32(0)
+	offset := float64(0)
 	if req.DefaultTimeOffsetSec != nil {
 		offset = *req.DefaultTimeOffsetSec
 	}

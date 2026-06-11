@@ -75,9 +75,10 @@ export function VideoMetadataModal({ video, onClose }: Props) {
         />
         <NumberInput
           label="Time Offset (秒)"
-          description="recorded_at に対する個別補正。Device default に追加される"
+          description="recorded_at に対する個別補正。Device default に追加される。小数可"
           value={timeOffsetSec}
           onChange={(v) => setTimeOffsetSec(typeof v === "number" ? v : 0)}
+          step={0.1}
         />
         <Text size="xs" c="dimmed">
           補正後の実時刻:{" "}

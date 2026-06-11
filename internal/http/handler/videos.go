@@ -42,29 +42,30 @@ type videoDTO struct {
 	// whenever RecordedAt is null.
 	EffectiveRecordedAt *time.Time `json:"effectiveRecordedAt"`
 	DurationSec         *int32     `json:"durationSec"`
-	TimeOffsetSec       int32      `json:"timeOffsetSec"`
+	TimeOffsetSec       float64    `json:"timeOffsetSec"`
 	HasThumbnail        bool       `json:"hasThumbnail"`
 	HLSStatus           string     `json:"hlsStatus"`
 	CreatedAt           time.Time  `json:"createdAt"`
 }
 
-// effectiveTimeOffsetSec is the total offset to subtract from a video's raw
-// recorded_at: the device's default offset plus the per-video override.
-func effectiveTimeOffsetSec(v sqlc.Video, deviceOffsetSec int32) int32 {
+// effectiveTimeOffsetSec is the total offset (in seconds, possibly fractional)
+// to subtract from a video's raw recorded_at: the device's default offset plus
+// the per-video override.
+func effectiveTimeOffsetSec(v sqlc.Video, deviceOffsetSec float64) float64 {
 	return deviceOffsetSec + v.TimeOffsetSec
 }
 
 // effectiveRecordedAt returns the real-world recording time, i.e. the raw
 // recorded_at minus the effective offset. Nil when recorded_at is unset.
-func effectiveRecordedAt(v sqlc.Video, deviceOffsetSec int32) *time.Time {
+func effectiveRecordedAt(v sqlc.Video, deviceOffsetSec float64) *time.Time {
 	if !v.RecordedAt.Valid {
 		return nil
 	}
-	t := v.RecordedAt.Time.Add(-time.Duration(effectiveTimeOffsetSec(v, deviceOffsetSec)) * time.Second)
+	t := v.RecordedAt.Time.Add(-time.Duration(effectiveTimeOffsetSec(v, deviceOffsetSec) * float64(time.Second)))
 	return &t
 }
 
-func toVideoDTO(v sqlc.Video, deviceOffsetSec int32) videoDTO {
+func toVideoDTO(v sqlc.Video, deviceOffsetSec float64) videoDTO {
 	var sessionID, deviceID, uploaderID *string
 	if v.SessionID.Valid {
 		s := uuidString(v.SessionID)
@@ -99,12 +100,12 @@ func toVideoDTO(v sqlc.Video, deviceOffsetSec int32) videoDTO {
 // deviceOffsets loads every device's default time offset keyed by device UUID
 // string, so video DTOs can resolve their effective recording time without an
 // N+1 lookup. Devices are few and global, so one query covers any page.
-func deviceOffsets(ctx context.Context, q *sqlc.Queries) (map[string]int32, error) {
+func deviceOffsets(ctx context.Context, q *sqlc.Queries) (map[string]float64, error) {
 	devs, err := q.ListDevices(ctx)
 	if err != nil {
 		return nil, err
 	}
-	m := make(map[string]int32, len(devs))
+	m := make(map[string]float64, len(devs))
 	for _, d := range devs {
 		m[uuidString(d.ID)] = d.DefaultTimeOffsetSec
 	}
@@ -113,7 +114,7 @@ func deviceOffsets(ctx context.Context, q *sqlc.Queries) (map[string]int32, erro
 
 // deviceOffsetFor returns the device default offset for a video, or 0 when the
 // video has no device or the device is unknown.
-func deviceOffsetFor(m map[string]int32, v sqlc.Video) int32 {
+func deviceOffsetFor(m map[string]float64, v sqlc.Video) float64 {
 	if !v.DeviceID.Valid {
 		return 0
 	}
@@ -122,7 +123,7 @@ func deviceOffsetFor(m map[string]int32, v sqlc.Video) int32 {
 
 // videoDeviceOffset resolves a single video's device default offset with one
 // lookup. Returns 0 when the video has no device or the device can't be read.
-func videoDeviceOffset(ctx context.Context, q *sqlc.Queries, v sqlc.Video) int32 {
+func videoDeviceOffset(ctx context.Context, q *sqlc.Queries, v sqlc.Video) float64 {
 	if !v.DeviceID.Valid {
 		return 0
 	}
@@ -142,7 +143,7 @@ type updateVideoRequest struct {
 	SessionID     Optional[string]    `json:"sessionId"`
 	DeviceID      Optional[string]    `json:"deviceId"`
 	RecordedAt    Optional[time.Time] `json:"recordedAt"`
-	TimeOffsetSec *int32              `json:"timeOffsetSec"`
+	TimeOffsetSec *float64            `json:"timeOffsetSec"`
 	DisplayName   *string             `json:"displayName"`
 }
 

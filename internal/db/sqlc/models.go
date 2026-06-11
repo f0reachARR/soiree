@@ -258,7 +258,7 @@ type BulkUploadFingerprint struct {
 type Device struct {
 	ID                   pgtype.UUID
 	Name                 string
-	DefaultTimeOffsetSec int32
+	DefaultTimeOffsetSec float64
 	CreatedAt            pgtype.Timestamptz
 }
 
@@ -423,7 +423,7 @@ type Video struct {
 	StorageKey       string
 	RecordedAt       pgtype.Timestamptz
 	DurationSec      *int32
-	TimeOffsetSec    int32
+	TimeOffsetSec    float64
 	CreatedAt        pgtype.Timestamptz
 	ThumbnailKey     *string
 	DisplayName      string

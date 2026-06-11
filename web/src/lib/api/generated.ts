@@ -1328,7 +1328,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             name: string;
-            /** @description 機材の時計ズレ（秒）。プラスなら機材時刻が進んでいる */
+            /** @description 機材の時計ズレ（秒、小数可）。プラスなら機材時刻が進んでいる */
             defaultTimeOffsetSec: number;
             /** Format: date-time */
             createdAt: string;
@@ -1567,7 +1567,7 @@ export interface components {
              */
             effectiveRecordedAt: string | null;
             durationSec?: number | null;
-            /** @description 個別オフセット（Device default に対する追加補正、秒） */
+            /** @description 個別オフセット（Device default に対する追加補正、秒、小数可） */
             timeOffsetSec: number;
             /** @description サムネイルが生成済みなら true。 GET /videos/{id}/thumbnail-url で取得 */
             hasThumbnail: boolean;

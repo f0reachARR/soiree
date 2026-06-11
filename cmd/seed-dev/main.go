@@ -181,7 +181,7 @@ func ensureOwnTeam(ctx context.Context, q *sqlc.Queries, name string) (sqlc.Team
 	return q.CreateTeam(ctx, sqlc.CreateTeamParams{Name: name, IsOwn: true})
 }
 
-func ensureDevice(ctx context.Context, q *sqlc.Queries, name string, offset int32) (sqlc.Device, error) {
+func ensureDevice(ctx context.Context, q *sqlc.Queries, name string, offset float64) (sqlc.Device, error) {
 	devices, err := q.ListDevices(ctx)
 	if err != nil {
 		return sqlc.Device{}, err

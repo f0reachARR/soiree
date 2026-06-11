@@ -2470,8 +2470,8 @@ components:
         name:
           type: string
         defaultTimeOffsetSec:
-          type: integer
-          description: 機材の時計ズレ（秒）。プラスなら機材時刻が進んでいる
+          type: number
+          description: 機材の時計ズレ（秒、小数可）。プラスなら機材時刻が進んでいる
         createdAt:
           type: string
           format: date-time
@@ -2483,7 +2483,7 @@ components:
           type: string
           minLength: 1
         defaultTimeOffsetSec:
-          type: integer
+          type: number
           default: 0
     UpdateDeviceRequest:
       type: object
@@ -2492,7 +2492,7 @@ components:
           type: string
           minLength: 1
         defaultTimeOffsetSec:
-          type: integer
+          type: number
     DeviceList:
       type: object
       required: [data, pagination]
@@ -2900,8 +2900,8 @@ components:
         durationSec:
           type: [integer, "null"]
         timeOffsetSec:
-          type: integer
-          description: 個別オフセット（Device default に対する追加補正、秒）
+          type: number
+          description: 個別オフセット（Device default に対する追加補正、秒、小数可）
         hasThumbnail:
           type: boolean
           description: サムネイルが生成済みなら true。 GET /videos/{id}/thumbnail-url で取得
@@ -2927,7 +2927,7 @@ components:
           type: [string, "null"]
           format: date-time
         timeOffsetSec:
-          type: integer
+          type: number
         displayName:
           type: string
     VideoList:
