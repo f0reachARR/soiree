@@ -105,10 +105,18 @@ export function Preview({
       const drift = Math.abs(el.currentTime - localT);
       const tolerance = playing ? 0.3 : 0.05;
       if (drift > tolerance) {
-        try {
-          el.currentTime = localT;
-        } catch {
-          // Some sources reject seeks before metadata; ignore.
+        // While playing, don't fight a still-loading element: seeking an HLS
+        // source that has no data yet just restarts fragment fetches and
+        // stalls playback (seek-thrash, looks like a frozen player). When
+        // paused a single seek is harmless, so allow it for scrubbing.
+        const canSeek =
+          !playing || (el.readyState >= 2 /* HAVE_CURRENT_DATA */ && !el.seeking);
+        if (canSeek) {
+          try {
+            el.currentTime = localT;
+          } catch {
+            // Some sources reject seeks before metadata; ignore.
+          }
         }
       }
       if (playing && el.paused) el.play().catch(() => {});
@@ -123,6 +131,44 @@ export function Preview({
     },
     [onPreviewTChange],
   );
+
+  // Start playback the way SyncPlayer does: seek every in-range video and
+  // WAIT for play() to resolve before flipping `playing` true. Otherwise the
+  // wall-clock loop sprints ahead of a video whose HLS manifest is still
+  // loading, the steering effect keeps re-seeking the moving target, and the
+  // player appears frozen ("再生を押しても動かない").
+  const startPlayback = useCallback(async () => {
+    let startT = previewT;
+    if (startT >= totalSec - 0.05) {
+      startT = 0;
+      onPreviewTChange(0);
+    }
+    await Promise.all(
+      videos.map(async (v) => {
+        const el = videoRefs.current.get(v.id);
+        if (!el) return;
+        const b = bandOf(v);
+        if (startT < b.startSec || startT > b.endSec) return;
+        try {
+          el.currentTime = startT - b.startSec;
+          await el.play();
+        } catch {
+          // Autoplay blocked or source not ready; the steering effect retries.
+        }
+      }),
+    );
+    setPlaying(true);
+  }, [previewT, totalSec, videos, bandOf, onPreviewTChange]);
+
+  const togglePlay = useCallback(() => {
+    if (playing) setPlaying(false);
+    else void startPlayback();
+  }, [playing, startPlayback]);
+
+  // Keep a stable ref so the keyboard listener doesn't need to re-subscribe
+  // every frame (startPlayback/togglePlay change as previewT advances).
+  const togglePlayRef = useRef(togglePlay);
+  togglePlayRef.current = togglePlay;
 
   // Keyboard shortcuts: space=play/pause, [=set start, ]=set end. Mounted
   // on the document so they work regardless of focus, but skipped while
@@ -141,7 +187,7 @@ export function Preview({
         onSetEnd();
       } else if (e.code === "Space") {
         e.preventDefault();
-        setPlaying((p) => !p);
+        togglePlayRef.current();
       }
     };
     document.addEventListener("keydown", onKey);
@@ -263,10 +309,7 @@ export function Preview({
           <Button
             size="xs"
             variant={playing ? "filled" : "default"}
-            onClick={() => {
-              if (previewT >= totalSec - 0.05) onPreviewTChange(0);
-              setPlaying((p) => !p);
-            }}
+            onClick={togglePlay}
           >
             {playing ? "■ 停止" : "▶ 再生"}
           </Button>
