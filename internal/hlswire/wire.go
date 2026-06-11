@@ -61,10 +61,9 @@ type FailRequest struct {
 
 // ProbeClaim is the per-job ClaimResponse.Payload for TypeProbe.
 type ProbeClaim struct {
-	VideoID             string `json:"videoId"`
-	SourceURL           string `json:"sourceUrl"`           // presigned GET, short-lived
-	ThumbnailKey        string `json:"thumbnailKey"`        // worker uploads here on success
-	DeviceTimeOffsetSec int32  `json:"deviceTimeOffsetSec"` // subtracted from recordedAt by the worker
+	VideoID      string `json:"videoId"`
+	SourceURL    string `json:"sourceUrl"`    // presigned GET, short-lived
+	ThumbnailKey string `json:"thumbnailKey"` // worker uploads here on success
 }
 
 // ProbeComplete is the body of POST /internal/worker/jobs/{id}/complete for

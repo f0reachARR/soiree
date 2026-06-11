@@ -2863,7 +2863,7 @@ components:
     # ---------- Video ----------
     Video:
       type: object
-      required: [id, tournamentId, storageKey, displayName, timeOffsetSec, hasThumbnail, hlsStatus, createdAt]
+      required: [id, tournamentId, storageKey, displayName, timeOffsetSec, effectiveRecordedAt, hasThumbnail, hlsStatus, createdAt]
       properties:
         id:
           type: string
@@ -2889,11 +2889,19 @@ components:
         recordedAt:
           type: [string, "null"]
           format: date-time
+          description: 撮影時刻の生値（ffprobe 抽出または手入力）。時刻補正は未適用
+        effectiveRecordedAt:
+          type: [string, "null"]
+          format: date-time
+          description: |
+            時刻補正を適用した実時刻 = recordedAt - (Device.defaultTimeOffsetSec
+            + timeOffsetSec)。タイムライン配置・重複判定・Session マッチングに
+            使う。recordedAt が null のときは null。
         durationSec:
           type: [integer, "null"]
         timeOffsetSec:
           type: integer
-          description: 個別オフセット（Device default に対する追加補正）
+          description: 個別オフセット（Device default に対する追加補正、秒）
         hasThumbnail:
           type: boolean
           description: サムネイルが生成済みなら true。 GET /videos/{id}/thumbnail-url で取得

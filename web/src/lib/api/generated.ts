@@ -1554,10 +1554,20 @@ export interface components {
             storageKey: string;
             /** @description UI 表示用の名前。初期値はアップロード時のファイル名 */
             displayName: string;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description 撮影時刻の生値（ffprobe 抽出または手入力）。時刻補正は未適用
+             */
             recordedAt?: string | null;
+            /**
+             * Format: date-time
+             * @description 時刻補正を適用した実時刻 = recordedAt - (Device.defaultTimeOffsetSec
+             *     + timeOffsetSec)。タイムライン配置・重複判定・Session マッチングに
+             *     使う。recordedAt が null のときは null。
+             */
+            effectiveRecordedAt: string | null;
             durationSec?: number | null;
-            /** @description 個別オフセット（Device default に対する追加補正） */
+            /** @description 個別オフセット（Device default に対する追加補正、秒） */
             timeOffsetSec: number;
             /** @description サムネイルが生成済みなら true。 GET /videos/{id}/thumbnail-url で取得 */
             hasThumbnail: boolean;

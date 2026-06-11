@@ -562,9 +562,14 @@ func (h *Runs) RecommendedVideos(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
+	offsets, err := deviceOffsets(r.Context(), h.Q)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
 	out := make([]videoDTO, len(rows))
 	for i, v := range rows {
-		out[i] = toVideoDTO(v)
+		out[i] = toVideoDTO(v, deviceOffsetFor(offsets, v))
 	}
 	writeJSON(w, http.StatusOK, struct {
 		Data []videoDTO `json:"data"`

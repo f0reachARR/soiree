@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"net/http"
@@ -25,22 +26,45 @@ type Videos struct {
 }
 
 type videoDTO struct {
-	ID            string     `json:"id"`
-	TournamentID  string     `json:"tournamentId"`
-	SessionID     *string    `json:"sessionId"`
-	DeviceID      *string    `json:"deviceId"`
-	UploaderID    *string    `json:"uploaderId"`
-	StorageKey    string     `json:"storageKey"`
-	DisplayName   string     `json:"displayName"`
-	RecordedAt    *time.Time `json:"recordedAt"`
-	DurationSec   *int32     `json:"durationSec"`
-	TimeOffsetSec int32      `json:"timeOffsetSec"`
-	HasThumbnail  bool       `json:"hasThumbnail"`
-	HLSStatus     string     `json:"hlsStatus"`
-	CreatedAt     time.Time  `json:"createdAt"`
+	ID           string  `json:"id"`
+	TournamentID string  `json:"tournamentId"`
+	SessionID    *string `json:"sessionId"`
+	DeviceID     *string `json:"deviceId"`
+	UploaderID   *string `json:"uploaderId"`
+	StorageKey   string  `json:"storageKey"`
+	DisplayName  string  `json:"displayName"`
+	// RecordedAt is the raw recording timestamp (ffprobe-extracted or
+	// hand-entered), without any time-offset correction applied.
+	RecordedAt *time.Time `json:"recordedAt"`
+	// EffectiveRecordedAt is RecordedAt corrected by the effective time offset
+	// (device default + per-video override). This is the real-world time used
+	// for timeline placement, overlap detection and session matching. Null
+	// whenever RecordedAt is null.
+	EffectiveRecordedAt *time.Time `json:"effectiveRecordedAt"`
+	DurationSec         *int32     `json:"durationSec"`
+	TimeOffsetSec       int32      `json:"timeOffsetSec"`
+	HasThumbnail        bool       `json:"hasThumbnail"`
+	HLSStatus           string     `json:"hlsStatus"`
+	CreatedAt           time.Time  `json:"createdAt"`
 }
 
-func toVideoDTO(v sqlc.Video) videoDTO {
+// effectiveTimeOffsetSec is the total offset to subtract from a video's raw
+// recorded_at: the device's default offset plus the per-video override.
+func effectiveTimeOffsetSec(v sqlc.Video, deviceOffsetSec int32) int32 {
+	return deviceOffsetSec + v.TimeOffsetSec
+}
+
+// effectiveRecordedAt returns the real-world recording time, i.e. the raw
+// recorded_at minus the effective offset. Nil when recorded_at is unset.
+func effectiveRecordedAt(v sqlc.Video, deviceOffsetSec int32) *time.Time {
+	if !v.RecordedAt.Valid {
+		return nil
+	}
+	t := v.RecordedAt.Time.Add(-time.Duration(effectiveTimeOffsetSec(v, deviceOffsetSec)) * time.Second)
+	return &t
+}
+
+func toVideoDTO(v sqlc.Video, deviceOffsetSec int32) videoDTO {
 	var sessionID, deviceID, uploaderID *string
 	if v.SessionID.Valid {
 		s := uuidString(v.SessionID)
@@ -55,20 +79,58 @@ func toVideoDTO(v sqlc.Video) videoDTO {
 		uploaderID = &s
 	}
 	return videoDTO{
-		ID:            uuidString(v.ID),
-		TournamentID:  uuidString(v.TournamentID),
-		SessionID:     sessionID,
-		DeviceID:      deviceID,
-		UploaderID:    uploaderID,
-		StorageKey:    v.StorageKey,
-		DisplayName:   v.DisplayName,
-		RecordedAt:    timeOrNil(v.RecordedAt),
-		DurationSec:   v.DurationSec,
-		TimeOffsetSec: v.TimeOffsetSec,
-		HasThumbnail:  v.ThumbnailKey != nil && *v.ThumbnailKey != "",
-		HLSStatus:     string(v.HLSStatus),
-		CreatedAt:     v.CreatedAt.Time,
+		ID:                  uuidString(v.ID),
+		TournamentID:        uuidString(v.TournamentID),
+		SessionID:           sessionID,
+		DeviceID:            deviceID,
+		UploaderID:          uploaderID,
+		StorageKey:          v.StorageKey,
+		DisplayName:         v.DisplayName,
+		RecordedAt:          timeOrNil(v.RecordedAt),
+		EffectiveRecordedAt: effectiveRecordedAt(v, deviceOffsetSec),
+		DurationSec:         v.DurationSec,
+		TimeOffsetSec:       v.TimeOffsetSec,
+		HasThumbnail:        v.ThumbnailKey != nil && *v.ThumbnailKey != "",
+		HLSStatus:           string(v.HLSStatus),
+		CreatedAt:           v.CreatedAt.Time,
 	}
+}
+
+// deviceOffsets loads every device's default time offset keyed by device UUID
+// string, so video DTOs can resolve their effective recording time without an
+// N+1 lookup. Devices are few and global, so one query covers any page.
+func deviceOffsets(ctx context.Context, q *sqlc.Queries) (map[string]int32, error) {
+	devs, err := q.ListDevices(ctx)
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[string]int32, len(devs))
+	for _, d := range devs {
+		m[uuidString(d.ID)] = d.DefaultTimeOffsetSec
+	}
+	return m, nil
+}
+
+// deviceOffsetFor returns the device default offset for a video, or 0 when the
+// video has no device or the device is unknown.
+func deviceOffsetFor(m map[string]int32, v sqlc.Video) int32 {
+	if !v.DeviceID.Valid {
+		return 0
+	}
+	return m[uuidString(v.DeviceID)]
+}
+
+// videoDeviceOffset resolves a single video's device default offset with one
+// lookup. Returns 0 when the video has no device or the device can't be read.
+func videoDeviceOffset(ctx context.Context, q *sqlc.Queries, v sqlc.Video) int32 {
+	if !v.DeviceID.Valid {
+		return 0
+	}
+	dev, err := q.GetDevice(ctx, v.DeviceID)
+	if err != nil {
+		return 0
+	}
+	return dev.DefaultTimeOffsetSec
 }
 
 type videoListResponse struct {
@@ -146,9 +208,14 @@ func (h *Videos) List(w http.ResponseWriter, r *http.Request) {
 		}
 		return encodeCursor(t, v.ID)
 	})
+	offsets, err := deviceOffsets(r.Context(), h.Q)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
 	out := make([]videoDTO, len(page))
 	for i, v := range page {
-		out[i] = toVideoDTO(v)
+		out[i] = toVideoDTO(v, deviceOffsetFor(offsets, v))
 	}
 	writeJSON(w, http.StatusOK, videoListResponse{Data: out, Pagination: pg})
 }
@@ -168,7 +235,7 @@ func (h *Videos) Get(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, toVideoDTO(v))
+	writeJSON(w, http.StatusOK, toVideoDTO(v, videoDeviceOffset(r.Context(), h.Q, v)))
 }
 
 func (h *Videos) Update(w http.ResponseWriter, r *http.Request) {
@@ -233,7 +300,7 @@ func (h *Videos) Update(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, toVideoDTO(v))
+	writeJSON(w, http.StatusOK, toVideoDTO(v, videoDeviceOffset(r.Context(), h.Q, v)))
 }
 
 func (h *Videos) Delete(w http.ResponseWriter, r *http.Request) {
@@ -459,11 +526,16 @@ func (h *Videos) EncodingJobs(w http.ResponseWriter, r *http.Request) {
 		key := uuidString(rd.VideoID)
 		byVideo[key] = append(byVideo[key], toRenditionDTO(rd))
 	}
+	offsets, err := deviceOffsets(r.Context(), h.Q)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
 	out := encodingJobListResponse{Data: make([]encodingJobDTO, 0, len(videos))}
 	for _, v := range videos {
 		key := uuidString(v.ID)
 		out.Data = append(out.Data, encodingJobDTO{
-			Video:      toVideoDTO(v),
+			Video:      toVideoDTO(v, deviceOffsetFor(offsets, v)),
 			Renditions: byVideo[key],
 		})
 	}

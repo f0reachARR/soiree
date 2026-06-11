@@ -46,7 +46,7 @@ export function SessionAssignModal({ video, onClose }: Props) {
       const session = await createSession.mutateAsync({
         name,
         modeHint: "practice",
-        startedAt: video.recordedAt ?? null,
+        startedAt: video.effectiveRecordedAt ?? null,
         // Sessions are tournament-scoped; reuse the video's tournament so the
         // newly created session lands in the same tournament as the upload.
         tournamentId: video.tournamentId,
