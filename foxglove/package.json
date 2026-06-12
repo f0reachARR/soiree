@@ -4,7 +4,7 @@
   "description": "Sync a Soiree Run's video alongside a rosbag in Foxglove.",
   "publisher": "f0reacharr",
   "homepage": "",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "license": "UNLICENSED",
   "main": "./dist/extension.js",
   "keywords": [],

@@ -327,6 +327,7 @@ function SoireePlayerPanel({ context }: { context: PanelExtensionContext }): Rea
                   key={rv.id}
                   runVideo={rv}
                   playback={playback}
+                  sessionToken={state.sessionToken}
                   target={target}
                   bagPlaying={bagPlaying}
                   isMain={mainVideoId === rv.videoId}

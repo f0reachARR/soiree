@@ -7,6 +7,10 @@ import type { VideoSyncTarget } from "./sync";
 type Props = {
   runVideo: RunVideo;
   playback?: PlaybackUrl;
+  // Session cookie value replayed as X-Soiree-Session on every HLS XHR. The
+  // master playlist and variant segments live behind the same auth wall as the
+  // REST API, but hls.js builds its own XHRs and won't inherit ours.
+  sessionToken: string;
   target?: VideoSyncTarget;
   // True when we believe the Foxglove timeline is currently advancing.
   bagPlaying: boolean;
@@ -26,6 +30,7 @@ const RATE_NUDGE_THRESHOLD_SEC = 0.08;
 export function VideoCell({
   runVideo,
   playback,
+  sessionToken,
   target,
   bagPlaying,
   isMain,
@@ -42,7 +47,14 @@ export function VideoCell({
     }
     if (playback.kind === "hls") {
       if (Hls.isSupported()) {
-        const hls = new Hls({ enableWorker: true });
+        const hls = new Hls({
+          enableWorker: true,
+          xhrSetup: (xhr) => {
+            if (sessionToken) {
+              xhr.setRequestHeader("X-Soiree-Session", sessionToken);
+            }
+          },
+        });
         hls.loadSource(playback.url);
         hls.attachMedia(video);
         hlsRef.current = hls;
@@ -51,20 +63,24 @@ export function VideoCell({
           hlsRef.current = null;
         };
       }
-      // Safari / native HLS fallback.
+      // Safari / native HLS fallback. Native HLS can't carry custom headers,
+      // so this path will only work if the proxy accepts a cookie of the same
+      // origin or the user is in a Foxglove build where the panel iframe
+      // shares cookies with the Soiree app.
       video.src = playback.url;
       return () => {
         video.removeAttribute("src");
         video.load();
       };
     }
-    // MP4 fallback while HLS is still encoding.
+    // MP4 fallback: the API returns a presigned S3 URL, so no auth header
+    // is needed on the playback URL itself.
     video.src = playback.url;
     return () => {
       video.removeAttribute("src");
       video.load();
     };
-  }, [playback]);
+  }, [playback, sessionToken]);
 
   // Sync video position with the bag's current time. We deliberately run this
   // on every render — props change at the Foxglove render cadence — instead of
