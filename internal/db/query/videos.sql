@@ -17,8 +17,8 @@ WHERE
   AND (sqlc.narg('session_id')::uuid IS NULL OR session_id = sqlc.narg('session_id')::uuid)
   AND (sqlc.narg('device_id')::uuid IS NULL OR device_id = sqlc.narg('device_id')::uuid)
   AND (sqlc.narg('unassigned')::bool IS NULL OR sqlc.narg('unassigned')::bool = false OR session_id IS NULL)
-  AND (sqlc.narg('cursor_created_at')::timestamptz IS NULL OR (COALESCE(recorded_at, created_at), id) > (sqlc.narg('cursor_created_at')::timestamptz, sqlc.narg('cursor_id')::uuid))
-ORDER BY COALESCE(recorded_at, created_at) ASC, id ASC
+  AND (sqlc.narg('cursor_created_at')::timestamptz IS NULL OR (COALESCE(recorded_at, created_at), id) < (sqlc.narg('cursor_created_at')::timestamptz, sqlc.narg('cursor_id')::uuid))
+ORDER BY COALESCE(recorded_at, created_at) DESC, id DESC
 LIMIT $1;
 
 -- name: UpdateVideo :one

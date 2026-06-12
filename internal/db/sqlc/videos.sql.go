@@ -148,8 +148,8 @@ WHERE
   AND ($3::uuid IS NULL OR session_id = $3::uuid)
   AND ($4::uuid IS NULL OR device_id = $4::uuid)
   AND ($5::bool IS NULL OR $5::bool = false OR session_id IS NULL)
-  AND ($6::timestamptz IS NULL OR (COALESCE(recorded_at, created_at), id) > ($6::timestamptz, $7::uuid))
-ORDER BY COALESCE(recorded_at, created_at) ASC, id ASC
+  AND ($6::timestamptz IS NULL OR (COALESCE(recorded_at, created_at), id) < ($6::timestamptz, $7::uuid))
+ORDER BY COALESCE(recorded_at, created_at) DESC, id DESC
 LIMIT $1
 `
 
