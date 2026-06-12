@@ -1800,7 +1800,7 @@ export interface components {
             runId: string;
             /** Format: uuid */
             authorId?: string | null;
-            /** @description Run 開始からの秒数（spec §3.4） */
+            /** @description Run 開始からの秒数（小数可、spec §3.4） */
             runOffsetSec: number;
             label: string;
             /**

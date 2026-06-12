@@ -267,7 +267,7 @@ type Marker struct {
 	ID           pgtype.UUID
 	RunID        pgtype.UUID
 	AuthorID     pgtype.UUID
-	RunOffsetSec int32
+	RunOffsetSec float64
 	Label        string
 	CreatedAt    pgtype.Timestamptz
 	MarkerTypeID pgtype.UUID

@@ -128,6 +128,8 @@ function RunDetailPage() {
         onSeek={(s) => seekRef.current(s)}
       />
 
+      <RunScoutingNote run={r} />
+
       <Group justify="space-between" mt="lg">
         <Title order={4}>紐づけアングル ({(r.videos ?? []).length})</Title>
         <Group gap="xs">
@@ -178,8 +180,6 @@ function RunDetailPage() {
         onSave={(body) => updateRun.mutate({ id: r.id, body })}
         saving={updateRun.isPending}
       />
-
-      <RunScoutingNote run={r} />
 
       {addVideoOpen && <AddRunVideoModal run={r} onClose={closeAddVideo} />}
     </Stack>

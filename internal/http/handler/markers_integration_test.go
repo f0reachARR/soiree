@@ -16,7 +16,7 @@ type markerResp struct {
 	ID           string             `json:"id"`
 	RunID        string             `json:"runId"`
 	AuthorID     *string            `json:"authorId"`
-	RunOffsetSec int32              `json:"runOffsetSec"`
+	RunOffsetSec float64            `json:"runOffsetSec"`
 	Label        string             `json:"label"`
 	MarkerTypeID *string            `json:"markerTypeId"`
 	MarkerType   *markerTypeRefResp `json:"markerType"`
@@ -172,6 +172,50 @@ func TestMarkerTypeDeletionKeepsMarkers(t *testing.T) {
 	mustStatus(t, rec, http.StatusOK)
 	if got.MarkerTypeID != nil || got.MarkerType != nil {
 		t.Errorf("expected untyped marker after type delete, got %+v", got)
+	}
+}
+
+// TestMarkerFractionalOffsetAndCursor verifies sub-second marker positions
+// survive the round-trip and that cursor pagination (keyed on run_offset_sec,
+// now double precision) keeps fractional ordering across pages.
+func TestMarkerFractionalOffsetAndCursor(t *testing.T) {
+	env := setupEnv(t)
+	runID, _, _ := createBasicRun(t, env)
+
+	offsets := []float64{5.25, 5.5, 12.75}
+	for _, off := range offsets {
+		var m markerResp
+		rec := env.do(t, http.MethodPost, "/runs/"+runID+"/markers",
+			map[string]any{"runOffsetSec": off}, &m)
+		mustStatus(t, rec, http.StatusCreated)
+		if m.RunOffsetSec != off {
+			t.Fatalf("fractional offset round-trip: sent %v got %v", off, m.RunOffsetSec)
+		}
+	}
+
+	// Page size 1 forces the cursor (offset|uuid) to encode/decode fractional
+	// offsets; the three markers must come back in fractional order.
+	var seen []float64
+	cursor := ""
+	for range offsets {
+		var page markerListResp
+		url := "/runs/" + runID + "/markers?limit=1"
+		if cursor != "" {
+			url += "&cursor=" + cursor
+		}
+		rec := env.do(t, http.MethodGet, url, nil, &page)
+		mustStatus(t, rec, http.StatusOK)
+		if len(page.Data) != 1 {
+			t.Fatalf("expected 1 marker per page, got %d", len(page.Data))
+		}
+		seen = append(seen, page.Data[0].RunOffsetSec)
+		if page.Pagination.NextCursor == nil {
+			break
+		}
+		cursor = *page.Pagination.NextCursor
+	}
+	if len(seen) != 3 || seen[0] != 5.25 || seen[1] != 5.5 || seen[2] != 12.75 {
+		t.Errorf("fractional cursor pagination order: %v", seen)
 	}
 }
 

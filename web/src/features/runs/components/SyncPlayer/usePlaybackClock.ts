@@ -120,6 +120,19 @@ export function usePlaybackClock({
     if (opts.broadcast !== false) onAfterUserChange();
   };
 
+  // Frame-step (コマ送り): pause if playing, then jump the clock by `delta`
+  // seconds (clamped to the timeline). Reuses seek() so the wall-clock anchor
+  // and presence broadcast stay consistent.
+  const stepFrame = (delta: number) => {
+    if (playingRef.current) {
+      for (const v of videos) refs.current.get(v.id)?.pause();
+      setPlaying(false);
+      playingRef.current = false;
+    }
+    const next = Math.min(runDurationSec, Math.max(0, lastT.current + delta));
+    seek(next);
+  };
+
   const applyExternalPlaying = async (shouldPlay: boolean) => {
     if (shouldPlay) {
       // play() is a no-op for an already-playing element, so it's safe to
@@ -182,6 +195,7 @@ export function usePlaybackClock({
     playingRef,
     lastT,
     seek,
+    stepFrame,
     togglePlay,
     applyExternalPlaying,
   };

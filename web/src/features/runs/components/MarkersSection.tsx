@@ -55,7 +55,7 @@ export function MarkersSection({
 
   const quickAdd = (markerTypeId: string) => {
     createMarker.mutate({
-      runOffsetSec: Math.round(currentSec),
+      runOffsetSec: currentSec,
       label: "",
       markerTypeId,
     });
@@ -203,7 +203,7 @@ export function MarkersSection({
           mode="create"
           markerTypes={types}
           initial={{
-            runOffsetSec: Math.round(currentSec),
+            runOffsetSec: currentSec,
             label: "",
             markerTypeId: null,
           }}

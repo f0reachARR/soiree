@@ -3314,8 +3314,8 @@ components:
           type: [string, "null"]
           format: uuid
         runOffsetSec:
-          type: integer
-          description: Run 開始からの秒数（spec §3.4）
+          type: number
+          description: Run 開始からの秒数（小数可、spec §3.4）
         label:
           type: string
         markerTypeId:
@@ -3335,7 +3335,7 @@ components:
       required: [runOffsetSec]
       properties:
         runOffsetSec:
-          type: integer
+          type: number
         label:
           type: string
           default: ""
@@ -3347,7 +3347,7 @@ components:
       type: object
       properties:
         runOffsetSec:
-          type: integer
+          type: number
         label:
           type: string
         markerTypeId:

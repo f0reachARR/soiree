@@ -20,8 +20,8 @@ SELECT
 FROM markers m
 LEFT JOIN marker_types mt ON mt.id = m.marker_type_id
 WHERE m.run_id = sqlc.arg('run_id')
-  AND (sqlc.narg('cursor_run_offset')::int IS NULL
-       OR (m.run_offset_sec, m.id) > (sqlc.narg('cursor_run_offset')::int, sqlc.narg('cursor_id')::uuid))
+  AND (sqlc.narg('cursor_run_offset')::double precision IS NULL
+       OR (m.run_offset_sec, m.id) > (sqlc.narg('cursor_run_offset')::double precision, sqlc.narg('cursor_id')::uuid))
   AND (COALESCE(array_length(sqlc.narg('marker_type_ids')::uuid[], 1), 0) = 0
        OR m.marker_type_id = ANY(sqlc.narg('marker_type_ids')::uuid[]))
 ORDER BY m.run_offset_sec ASC, m.id ASC

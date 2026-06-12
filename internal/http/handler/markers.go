@@ -59,7 +59,7 @@ type markerDTO struct {
 	ID           string         `json:"id"`
 	RunID        string         `json:"runId"`
 	AuthorID     *string        `json:"authorId"`
-	RunOffsetSec int32          `json:"runOffsetSec"`
+	RunOffsetSec float64        `json:"runOffsetSec"`
 	Label        string         `json:"label"`
 	MarkerTypeID *string        `json:"markerTypeId"`
 	MarkerType   *markerTypeRef `json:"markerType"`
@@ -69,7 +69,7 @@ type markerDTO struct {
 // markerDTOFrom builds the DTO from the joined fields shared by GetMarkerRow
 // and ListMarkersByRunRow. typeName/typeColor are nil when the marker has no
 // type (LEFT JOIN miss).
-func markerDTOFrom(id, runID, authorID, typeID pgtype.UUID, runOffset int32, label string, createdAt time.Time, typeName, typeColor *string) markerDTO {
+func markerDTOFrom(id, runID, authorID, typeID pgtype.UUID, runOffset float64, label string, createdAt time.Time, typeName, typeColor *string) markerDTO {
 	var author *string
 	if authorID.Valid {
 		s := uuidString(authorID)
@@ -107,25 +107,26 @@ type markerListResponse struct {
 }
 
 type createMarkerRequest struct {
-	RunOffsetSec int32   `json:"runOffsetSec"`
+	RunOffsetSec float64 `json:"runOffsetSec"`
 	Label        string  `json:"label"`
 	MarkerTypeID *string `json:"markerTypeId"`
 }
 
 type updateMarkerRequest struct {
-	RunOffsetSec *int32           `json:"runOffsetSec"`
+	RunOffsetSec *float64         `json:"runOffsetSec"`
 	Label        *string          `json:"label"`
 	MarkerTypeID Optional[string] `json:"markerTypeId"`
 }
 
 // markerCursor encodes "<offset>|<uuid>" as base64 — markers are ordered by
-// (run_offset_sec, id), not (created_at, id) like the other resources.
-func encodeMarkerCursor(offset int32, id pgtype.UUID) string {
-	raw := fmt.Sprintf("%d|%s", offset, uuidString(id))
+// (run_offset_sec, id), not (created_at, id) like the other resources. The
+// offset is a fractional second, so it is formatted as a float.
+func encodeMarkerCursor(offset float64, id pgtype.UUID) string {
+	raw := fmt.Sprintf("%s|%s", strconv.FormatFloat(offset, 'f', -1, 64), uuidString(id))
 	return base64.RawURLEncoding.EncodeToString([]byte(raw))
 }
 
-func decodeMarkerCursor(s string) (*int32, pgtype.UUID, error) {
+func decodeMarkerCursor(s string) (*float64, pgtype.UUID, error) {
 	if s == "" {
 		return nil, pgtype.UUID{}, nil
 	}
@@ -137,11 +138,10 @@ func decodeMarkerCursor(s string) (*int32, pgtype.UUID, error) {
 	if len(parts) != 2 {
 		return nil, pgtype.UUID{}, errors.New("invalid cursor format")
 	}
-	n, err := strconv.ParseInt(parts[0], 10, 32)
+	off, err := strconv.ParseFloat(parts[0], 64)
 	if err != nil {
 		return nil, pgtype.UUID{}, fmt.Errorf("invalid cursor offset: %w", err)
 	}
-	off := int32(n)
 	id, err := parseUUIDParam(parts[1])
 	if err != nil {
 		return nil, pgtype.UUID{}, fmt.Errorf("invalid cursor id: %w", err)

@@ -38,7 +38,7 @@ export function MarkerEditModal({
     defaultValues: initial,
     onSubmit: ({ value }) => {
       onSubmit({
-        runOffsetSec: Math.max(0, Math.round(value.runOffsetSec)),
+        runOffsetSec: Math.max(0, value.runOffsetSec),
         label: value.label,
         markerTypeId: value.markerTypeId,
       });
@@ -63,9 +63,12 @@ export function MarkerEditModal({
             {(field) => (
               <NumberInput
                 label="位置 (秒、Run 開始から)"
+                description="小数可"
                 value={field.state.value}
                 min={0}
                 max={durationSec > 0 ? durationSec : undefined}
+                step={0.1}
+                decimalScale={2}
                 onChange={(v) =>
                   field.handleChange(typeof v === "number" ? v : 0)
                 }

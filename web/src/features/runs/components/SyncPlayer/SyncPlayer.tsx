@@ -21,6 +21,7 @@ import {
 } from "../../../annotations/components/AnnotationToolbar";
 import type { OverlayMode } from "../../../annotations/components/RunVideoOverlay";
 import { formatTime } from "../../lib/format";
+import { COARSE_STEP_SEC, FRAME_STEP_SEC } from "../../lib/frameStep";
 import { angleDuration } from "../../lib/timeMap";
 import {
   usePresence,
@@ -181,6 +182,32 @@ export function SyncPlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videos, registerSeek]);
 
+  // Keyboard frame-step (コマ送り): ←/→ nudge one frame, Shift for a coarse
+  // 1s jump. Document-level so it works without clicking the player, but
+  // ignored while typing (incl. the collab note / annotation label inputs).
+  const stepFrameRef = useRef(clock.stepFrame);
+  stepFrameRef.current = clock.stepFrame;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable)
+        return;
+      // The Mantine slider thumb (role="slider") owns ←/→ for scrubbing while
+      // focused; don't double-handle it as a frame step.
+      if (target?.closest('[role="slider"]')) return;
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        stepFrameRef.current(e.shiftKey ? COARSE_STEP_SEC : FRAME_STEP_SEC);
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        stepFrameRef.current(e.shiftKey ? -COARSE_STEP_SEC : -FRAME_STEP_SEC);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
   // Emit immediately when our Main angle changes so followers switch with us
   // instead of waiting for the next periodic tick.
   useEffect(() => {
@@ -289,6 +316,9 @@ export function SyncPlayer({
         </Button>
         <Text size="sm" ff="monospace" w={120}>
           {formatTime(t)} / {formatTime(runDurationSec)}
+        </Text>
+        <Text size="xs" c="dimmed" title="←→ で 1 フレーム、Shift + ←→ で 1 秒">
+          ←→ コマ送り
         </Text>
         <div style={{ flex: 1, position: "relative" }}>
           <Slider

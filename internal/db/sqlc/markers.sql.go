@@ -65,7 +65,7 @@ RETURNING id, run_id, author_id, run_offset_sec, label, created_at, marker_type_
 type CreateMarkerParams struct {
 	RunID        pgtype.UUID
 	AuthorID     pgtype.UUID
-	RunOffsetSec int32
+	RunOffsetSec float64
 	Label        string
 	MarkerTypeID pgtype.UUID
 }
@@ -117,7 +117,7 @@ type GetMarkerRow struct {
 	ID              pgtype.UUID
 	RunID           pgtype.UUID
 	AuthorID        pgtype.UUID
-	RunOffsetSec    int32
+	RunOffsetSec    float64
 	Label           string
 	CreatedAt       pgtype.Timestamptz
 	MarkerTypeID    pgtype.UUID
@@ -150,8 +150,8 @@ SELECT
 FROM markers m
 LEFT JOIN marker_types mt ON mt.id = m.marker_type_id
 WHERE m.run_id = $2
-  AND ($3::int IS NULL
-       OR (m.run_offset_sec, m.id) > ($3::int, $4::uuid))
+  AND ($3::double precision IS NULL
+       OR (m.run_offset_sec, m.id) > ($3::double precision, $4::uuid))
   AND (COALESCE(array_length($5::uuid[], 1), 0) = 0
        OR m.marker_type_id = ANY($5::uuid[]))
 ORDER BY m.run_offset_sec ASC, m.id ASC
@@ -161,7 +161,7 @@ LIMIT $1
 type ListMarkersByRunParams struct {
 	Limit           int32
 	RunID           pgtype.UUID
-	CursorRunOffset *int32
+	CursorRunOffset *float64
 	CursorID        pgtype.UUID
 	MarkerTypeIds   []pgtype.UUID
 }
@@ -170,7 +170,7 @@ type ListMarkersByRunRow struct {
 	ID              pgtype.UUID
 	RunID           pgtype.UUID
 	AuthorID        pgtype.UUID
-	RunOffsetSec    int32
+	RunOffsetSec    float64
 	Label           string
 	CreatedAt       pgtype.Timestamptz
 	MarkerTypeID    pgtype.UUID
@@ -227,7 +227,7 @@ RETURNING id, run_id, author_id, run_offset_sec, label, created_at, marker_type_
 `
 
 type UpdateMarkerParams struct {
-	RunOffsetSec  *int32
+	RunOffsetSec  *float64
 	Label         *string
 	SetMarkerType bool
 	MarkerTypeID  pgtype.UUID

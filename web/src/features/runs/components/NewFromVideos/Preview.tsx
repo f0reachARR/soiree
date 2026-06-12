@@ -7,6 +7,7 @@ import { useHlsSource } from "../../../../components/player/useHlsSource";
 import { formatDateTimeFull } from "../../../../lib/time";
 import { formatTime } from "../../lib/format";
 import type { Region } from "./types";
+import { COARSE_STEP_SEC, FRAME_STEP_SEC } from "../../lib/frameStep";
 
 // Always-on multi-angle preview spanning the full timeline. Each video is
 // steered to its local time (videoOffsetStart + (t - videoStartAbs));
@@ -165,14 +166,25 @@ export function Preview({
     else void startPlayback();
   }, [playing, startPlayback]);
 
-  // Keep a stable ref so the keyboard listener doesn't need to re-subscribe
-  // every frame (startPlayback/togglePlay change as previewT advances).
+  // Frame-step (コマ送り): pause and nudge the timeline by a fixed amount.
+  const stepBy = useCallback(
+    (delta: number) => {
+      setPlaying(false);
+      onPreviewTChange(Math.min(totalSec, Math.max(0, previewT + delta)));
+    },
+    [previewT, totalSec, onPreviewTChange],
+  );
+
+  // Keep stable refs so the keyboard listener doesn't need to re-subscribe
+  // every frame (togglePlay/stepBy change as previewT advances).
   const togglePlayRef = useRef(togglePlay);
   togglePlayRef.current = togglePlay;
+  const stepByRef = useRef(stepBy);
+  stepByRef.current = stepBy;
 
-  // Keyboard shortcuts: space=play/pause, [=set start, ]=set end. Mounted
-  // on the document so they work regardless of focus, but skipped while
-  // typing in a form field.
+  // Keyboard shortcuts: space=play/pause, [=set start, ]=set end,
+  // ←/→=frame step (Shift for a coarse 1s jump). Mounted on the document so
+  // they work regardless of focus, but skipped while typing in a form field.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -188,6 +200,12 @@ export function Preview({
       } else if (e.code === "Space") {
         e.preventDefault();
         togglePlayRef.current();
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        stepByRef.current(e.shiftKey ? COARSE_STEP_SEC : FRAME_STEP_SEC);
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        stepByRef.current(e.shiftKey ? -COARSE_STEP_SEC : -FRAME_STEP_SEC);
       }
     };
     document.addEventListener("keydown", onKey);
@@ -347,7 +365,7 @@ export function Preview({
             </>
           )}
           <Text size="xs" c="dimmed" ml="auto">
-            ショートカット: [ 開始 / ] 終了 / Space 再生
+            ショートカット: [ 開始 / ] 終了 / Space 再生 / ←→ コマ送り (Shift で1秒)
           </Text>
         </Group>
       </Stack>
