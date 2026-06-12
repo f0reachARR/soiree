@@ -25,6 +25,12 @@ type AuthDeps struct {
 	DevBypass bool
 }
 
+// SessionHeaderName carries a session-cookie value supplied by clients that
+// cannot set the Cookie header directly (e.g. browser-based Foxglove panel
+// extensions). The header value is the same signed string a browser would
+// store in the `soiree_session` cookie.
+const SessionHeaderName = "X-Soiree-Session"
+
 // LoadUser reads the session cookie (or, when DevBypass is true, the
 // X-User-Id header), looks up the user, and attaches them to the request
 // context. Unauthenticated requests pass through unmodified — handlers that
@@ -56,21 +62,28 @@ func resolveSessionUser(r *http.Request, deps AuthDeps, now time.Time) *sqlc.Use
 	if deps.Signer == nil {
 		return nil
 	}
-	c, err := r.Cookie(auth.SessionCookieName)
-	if err != nil || c.Value == "" {
+	value := sessionTokenFromRequest(r)
+	if value == "" {
 		return nil
 	}
-	sess, err := deps.Signer.DecodeSession(c.Value)
+	sess, err := deps.Signer.DecodeSession(value)
 	if err != nil {
 		// Tampered or stale cookie — silently ignore so a corrupted cookie
 		// just becomes an anonymous request, not a 500.
-		slog.Debug("session cookie decode failed", "error", err)
+		slog.Debug("session token decode failed", "error", err)
 		return nil
 	}
 	if sess.IsExpired(now) {
 		return nil
 	}
 	return loadUser(r, deps, sess.UserID)
+}
+
+func sessionTokenFromRequest(r *http.Request) string {
+	if c, err := r.Cookie(auth.SessionCookieName); err == nil && c.Value != "" {
+		return c.Value
+	}
+	return strings.TrimSpace(r.Header.Get(SessionHeaderName))
 }
 
 func resolveHeaderUser(r *http.Request, deps AuthDeps) *sqlc.User {

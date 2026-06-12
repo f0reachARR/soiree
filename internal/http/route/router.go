@@ -51,7 +51,7 @@ func New(d Deps) http.Handler {
 		r.Use(cors.Handler(cors.Options{
 			AllowedOrigins:   d.AllowedOrigins,
 			AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-			AllowedHeaders:   []string{"Content-Type", "Authorization", "X-User-Id"},
+			AllowedHeaders:   []string{"Content-Type", "Authorization", "X-User-Id", appmid.SessionHeaderName},
 			AllowCredentials: true,
 			MaxAge:           300,
 		}))
