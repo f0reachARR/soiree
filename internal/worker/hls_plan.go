@@ -73,17 +73,34 @@ func (w *PlanHLSWorker) Work(ctx context.Context, job *river.Job[PlanHLSArgs]) e
 	srcH := *v.SourceHeight
 	srcW := *v.SourceWidth
 
-	specs := []renditionSpec{{
-		kind:         sqlc.RenditionKindOriginal,
-		height:       srcH,
-		videoBitrate: "5000k",
-		audioBitrate: "192k",
-		bandwidthBps: estimateOriginalBandwidth(srcW, srcH),
-	}}
+	// Build the rendition ladder, capped at 1080p. Sources taller than 1080p
+	// are downscaled to the standard 1080p tier (no full-resolution variant).
+	// Sources at or below 1080p keep their native resolution as a single top
+	// variant, labeled "original".
+	capH := srcH
+	if capH > 1080 {
+		capH = 1080
+	}
+
+	var specs []renditionSpec
+	// Standard downscale tiers strictly below the capped source height.
 	for _, s := range renditionsAscending {
-		if srcH >= s.height {
+		if s.height < capH {
 			specs = append(specs, s)
 		}
+	}
+	// Top variant at the capped height.
+	if srcH >= 1080 {
+		// renditionsAscending is sorted ascending, so the last entry is the
+		// 1080p cap tier.
+		specs = append(specs, renditionsAscending[len(renditionsAscending)-1])
+	} else {
+		// Native source resolution (below 1080p), kept as the "original" variant.
+		specs = append(specs, renditionSpec{
+			kind:         sqlc.RenditionKindOriginal,
+			height:       srcH,
+			bandwidthBps: estimateOriginalBandwidth(srcW, srcH),
+		})
 	}
 
 	if _, err := w.Q.UpdateVideoHLSStatus(ctx, sqlc.UpdateVideoHLSStatusParams{
@@ -98,10 +115,8 @@ func (w *PlanHLSWorker) Work(ctx context.Context, job *river.Job[PlanHLSArgs]) e
 		bw := s.bandwidthBps
 		playlistKey := fmt.Sprintf("hls/%s/%s/playlist.m3u8", v.ID.String(), string(s.kind))
 
-		// We always re-encode, even the original-resolution rendition. `-c copy`
-		// passthrough is intentionally disabled: it produced fragile playlists
-		// for some source codecs/profiles, so the original is now transcoded at
-		// its source resolution like every other rendition.
+		// We always re-encode. `-c copy` passthrough is intentionally disabled:
+		// it produced fragile playlists for some source codecs/profiles.
 		rend, err := w.Q.InsertRendition(ctx, sqlc.InsertRenditionParams{
 			VideoID:      pgID,
 			Kind:         s.kind,
@@ -123,9 +138,6 @@ func (w *PlanHLSWorker) Work(ctx context.Context, job *river.Job[PlanHLSArgs]) e
 }
 
 func dimensionsFor(spec renditionSpec, srcW, srcH int32) (w, h int32) {
-	if spec.kind == sqlc.RenditionKindOriginal {
-		return srcW, srcH
-	}
 	// keep aspect ratio: width = round_even(srcW * targetH / srcH)
 	if srcH == 0 {
 		return srcW, spec.height
@@ -138,17 +150,17 @@ func dimensionsFor(spec renditionSpec, srcW, srcH int32) (w, h int32) {
 }
 
 // estimateOriginalBandwidth is a rough cap used in the master playlist
-// BANDWIDTH attribute. We don't know the source's actual encoded bitrate
-// without re-probing; this errs high so adaptive selection picks original
-// only on fast connections.
+// BANDWIDTH attribute for the native-resolution "original" variant, which is
+// always at or below 1080p. We don't know the source's actual encoded bitrate
+// without re-probing, so this tracks the height-based encode target.
 func estimateOriginalBandwidth(w, h int32) int32 {
 	pixels := int64(w) * int64(h)
 	switch {
-	case pixels >= 1920*1080:
-		return 6_000_000
 	case pixels >= 1280*720:
-		return 4_000_000
+		return 3_500_000
+	case pixels >= 854*480:
+		return 1_800_000
 	default:
-		return 2_000_000
+		return 1_100_000
 	}
 }

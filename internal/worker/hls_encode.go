@@ -142,7 +142,7 @@ func (w *EncodeVariantWorker) Work(ctx context.Context, job *river.Job[EncodeVar
 	if !rend.Passthrough {
 		claim.Width = rend.Width
 		claim.Height = rend.Height
-		claim.VideoBitrate = videoBitrateFor(rend.Kind)
+		claim.VideoBitrate = videoBitrateFor(rend.Kind, rend.Height)
 		claim.AudioBitrate = audioBitrateFor(rend.Kind)
 	}
 	payload, err := json.Marshal(claim)
@@ -199,7 +199,7 @@ func (w *EncodeVariantWorker) Work(ctx context.Context, job *river.Job[EncodeVar
 	return nil
 }
 
-func videoBitrateFor(kind sqlc.RenditionKind) string {
+func videoBitrateFor(kind sqlc.RenditionKind, height int32) string {
 	switch kind {
 	case sqlc.RenditionKind1080p:
 		return "4500k"
@@ -208,7 +208,18 @@ func videoBitrateFor(kind sqlc.RenditionKind) string {
 	case sqlc.RenditionKind480p:
 		return "1200k"
 	default:
-		return "5000k"
+		// "original" variant: native resolution capped at 1080p. Pick a target
+		// from its height so low-res sources aren't padded up to a flat bitrate.
+		switch {
+		case height >= 1080:
+			return "4500k"
+		case height >= 720:
+			return "3000k"
+		case height >= 480:
+			return "1500k"
+		default:
+			return "900k"
+		}
 	}
 }
 
